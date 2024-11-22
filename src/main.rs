@@ -7,7 +7,7 @@ use std::sync::Arc;
 use tokio::{net, runtime, signal};
 use tracing::{error, info};
 
-const CONFIG_FILE: &str = "config.jsom";
+const CONFIG_FILE: &str = "config.json";
 
 fn main() -> Result<(), Box<dyn Error>> {
     tracing_subscriber::fmt().init();
