@@ -15,17 +15,6 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use uuid::Uuid;
 
 pub fn routes() -> axum::Router<state::State> {
-    //     let session_server = axum::Router::new()
-    //         .route("/hasJoined", on(MethodFilter::GET, has_joined))
-    //         .route("/profile/:uuid", on(MethodFilter::GET, profile_by_uuid));
-    //
-    //     let router = axum::Router::new()
-    //         .route("/:server_id", on(MethodFilter::GET, root))
-    //         .nest(
-    //             "/:server_id/sessionserver/session/minecraft",
-    //             session_server,
-    //         )
-    //         .with_state(state);
     axum::Router::new()
         .route("/hasJoined", on(MethodFilter::GET, has_joined))
         .route("/profile/:uuid", on(MethodFilter::GET, profile_by_uuid))
