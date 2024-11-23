@@ -32,13 +32,10 @@ async fn has_joined(
         return StatusCode::NO_CONTENT.into_response();
     };
 
-    let Ok(check_server) = ({
-        let socket = socket.lock().await;
-
-        socket
-            .check_server(query.username, query.server_id, false, false)
-            .await
-    }) else {
+    let Ok(check_server) = socket
+        .check_server(query.username, query.server_id, false, false)
+        .await
+    else {
         return StatusCode::NO_CONTENT.into_response();
     };
 
@@ -60,11 +57,7 @@ async fn profile_by_uuid(
         return StatusCode::NO_CONTENT.into_response();
     };
 
-    let Ok(profile) = ({
-        let socket = socket.lock().await;
-
-        socket.get_profile_by_uuid(uuid).await
-    }) else {
+    let Ok(profile) = socket.get_profile_by_uuid(uuid).await else {
         return StatusCode::NO_CONTENT.into_response();
     };
 

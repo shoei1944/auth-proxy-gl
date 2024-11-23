@@ -28,11 +28,7 @@ async fn profiles_by_usernames(
         .map(|username| {
             let socket = socket.clone();
 
-            async move {
-                let socket = socket.lock().await;
-
-                socket.get_profile_by_username(username).await
-            }
+            async move { socket.get_profile_by_username(username).await }
         })
         .collect::<Vec<_>>()
         .await;

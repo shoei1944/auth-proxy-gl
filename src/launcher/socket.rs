@@ -187,7 +187,6 @@ struct ActorMessage {
 type Callbacks = DashMap<Uuid, oneshot::Sender<response::any::Kind>>;
 
 type ActorSender = mpsc::Sender<ActorMessage>;
-type ActorReceiver = mpsc::Receiver<ActorMessage>;
 
 type WebSocketSender = SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, tungstenite::Message>;
 type WebSocketReceiver = SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>>;

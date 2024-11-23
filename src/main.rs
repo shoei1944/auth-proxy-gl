@@ -1,5 +1,6 @@
 use auth_proxy_gl::config::Config as AppConfig;
-use auth_proxy_gl::{launcher, routes, state};
+use auth_proxy_gl::state::Sockets;
+use auth_proxy_gl::{routes, state};
 use figment::providers;
 use figment::providers::Format;
 use std::error::Error;
@@ -7,7 +8,6 @@ use std::fs;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::{net, runtime, signal};
-use tracing::{error, info, span, Level};
 
 const CONFIG_FILE: &str = "config.json";
 
@@ -24,9 +24,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .join(providers::Json::file(CONFIG_FILE))
         .extract::<AppConfig>()?;
 
-    let rt = runtime::Builder::new_multi_thread()
-        .enable_all()
-        .build()?;
+    let rt = runtime::Builder::new_multi_thread().enable_all().build()?;
 
     rt.block_on(_main(config))
 }
@@ -35,7 +33,7 @@ async fn _main(config: AppConfig) -> Result<(), Box<dyn Error>> {
     let addr = format!("{}:{}", config.api.host, config.api.port).parse::<SocketAddr>()?;
     let listener = net::TcpListener::bind(addr).await?;
 
-    let sockets = connect_sockets(&config).await;
+    let sockets = Sockets::from_servers(&config.servers).await;
 
     let router = axum::Router::new()
         .nest(
@@ -59,51 +57,4 @@ async fn _main(config: AppConfig) -> Result<(), Box<dyn Error>> {
         .await?;
 
     Ok(())
-}
-
-async fn connect_sockets(config: &AppConfig) -> state::Sockets {
-    let mut sockets = state::Sockets::default();
-
-    for (server_id, data) in &config.servers {
-        let servers_span = span!(
-            Level::INFO,
-            "connect_sockets ",
-            id = server_id,
-            api = data.api
-        );
-        let _enter = servers_span.enter();
-
-        let socket = match launcher::Socket::new(&data.api).await {
-            Ok(v) => v,
-            Err(err) => {
-                error!("Error with connecting to socket: {}", err);
-
-                continue;
-            }
-        };
-
-        let pair = launcher::types::request::restore_token::Pair {
-            name: "checkServer".to_string(),
-            value: data.token.clone(),
-        };
-        match socket.restore_token(pair, false).await {
-            Ok(v) => {
-                if !v.invalid_tokens.is_empty() {
-                    error!("Invalid tokens received: {:?}", v.invalid_tokens);
-
-                    continue;
-                }
-            }
-            Err(err) => {
-                error!("Error with send restore token request: {:?}", err);
-
-                continue;
-            }
-        }
-
-        info!("Connected");
-        sockets.insert(server_id, socket)
-    }
-
-    sockets
 }
