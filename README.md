@@ -87,7 +87,7 @@ token server SERVER-NAME std false
 ```json
 "servers": {
   "1.20.1-Vanilla": {
-    "routes": "wss://launcher.example.com/routes",
+    "api": "wss://launcher.example.com/api",
     "token": "abcd1234efgh5678"
   }
 }
