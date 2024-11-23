@@ -14,7 +14,7 @@ use base64::Engine;
 use std::time::{SystemTime, UNIX_EPOCH};
 use uuid::Uuid;
 
-pub fn routes() -> axum::Router<state::State> {
+pub fn router() -> axum::Router<state::State> {
     axum::Router::new()
         .route("/hasJoined", on(MethodFilter::GET, has_joined))
         .route("/profile/:uuid", on(MethodFilter::GET, profile_by_uuid))

@@ -1,5 +1,5 @@
 use auth_proxy_gl::config::Config as AppConfig;
-use auth_proxy_gl::{api, launcher, state};
+use auth_proxy_gl::{launcher, routes, state};
 use figment::providers;
 use figment::providers::Format;
 use std::error::Error;
@@ -40,10 +40,13 @@ async fn _main(config: AppConfig) -> Result<(), Box<dyn Error>> {
     let router = axum::Router::new()
         .nest(
             "/:server_id",
-            axum::Router::new().merge(api::root::routes()).nest(
-                "/sessionserver/session/minecraft",
-                api::sessions_server::routes(),
-            ),
+            axum::Router::new()
+                .merge(routes::root::router())
+                .nest("/api", routes::api::router())
+                .nest(
+                    "/sessionserver/session/minecraft",
+                    routes::sessionserver_session_minecraft::router(),
+                ),
         )
         .with_state(state::State {
             config: Arc::new(config),

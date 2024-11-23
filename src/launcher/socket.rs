@@ -137,6 +137,28 @@ impl Socket {
         }
     }
 
+    pub async fn get_profile_by_username(
+        &self,
+        username: impl Into<String>,
+    ) -> Result<response::get_profile_by_username::GetProfileByUsername, error::Error> {
+        let response = self
+            .send_to_actor(request::Request {
+                id: Uuid::new_v4(),
+                body: request::any::Kind::GetProfileByUsername(
+                    request::get_profile_by_username::GetProfileByUsername {
+                        username: username.into(),
+                    },
+                ),
+            })
+            .await?;
+
+        if let response::any::Kind::GetProfileByUsername(get_profile_by_username) = response {
+            Ok(get_profile_by_username)
+        } else {
+            Err(error::Error::UnexpectedResponse(response))
+        }
+    }
+
     async fn send_to_actor(
         &self,
         request: request::any::Any,

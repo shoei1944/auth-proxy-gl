@@ -32,6 +32,13 @@ pub mod profile_by_uuid {
 
     #[derive(Serialize, Deserialize)]
     pub struct Query {
-        pub unsigned: bool
+        pub unsigned: bool,
     }
+}
+
+pub mod profiles_by_usernames {
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Serialize, Deserialize)]
+    pub struct Body(pub Vec<String>);
 }

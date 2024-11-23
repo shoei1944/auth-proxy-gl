@@ -14,7 +14,8 @@ pub struct Response<T: Serialize + DeserializeOwned> {
 
 pub mod any {
     use crate::launcher::types::response::{
-        check_server, error, get_profile_by_uuid, get_public_key, restore_token, Response,
+        check_server, error, get_profile_by_username, get_profile_by_uuid, get_public_key,
+        restore_token, Response,
     };
     use serde::{Deserialize, Serialize};
 
@@ -34,6 +35,9 @@ pub mod any {
 
         #[serde(rename = "profileByUUID")]
         GetProfileByUuid(get_profile_by_uuid::GetProfileByUuid),
+
+        #[serde(rename = "profileByUsername")]
+        GetProfileByUsername(get_profile_by_username::GetProfileByUsername),
 
         #[serde(rename = "error")]
         Error(error::Error),
@@ -153,5 +157,16 @@ pub mod get_profile_by_uuid {
         pub struct Cape {
             pub url: String,
         }
+    }
+}
+
+pub mod get_profile_by_username {
+    use crate::launcher::types::response::get_profile_by_uuid;
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Serialize, Deserialize, Debug)]
+    pub struct GetProfileByUsername {
+        #[serde(rename = "playerProfile")]
+        pub player_profile: get_profile_by_uuid::Profile,
     }
 }
