@@ -38,10 +38,12 @@ async fn _main(config: AppConfig) -> Result<(), Box<dyn Error>> {
     let sockets = connect_sockets(&config).await;
 
     let router = axum::Router::new()
-        .nest("/:server_id", api::root::routes())
         .nest(
-            "/:server_id/sessionserver/session/minecraft",
-            api::sessions_server::routes(),
+            "/:server_id",
+            axum::Router::new().merge(api::root::routes()).nest(
+                "/sessionserver/session/minecraft",
+                api::sessions_server::routes(),
+            ),
         )
         .with_state(state::State {
             config: Arc::new(config),
