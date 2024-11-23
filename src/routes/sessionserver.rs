@@ -8,16 +8,19 @@ use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::routing::{on, MethodFilter};
-use axum::Json;
+use axum::{Json, Router};
 use base64::prelude::BASE64_STANDARD;
 use base64::Engine;
 use std::time::{SystemTime, UNIX_EPOCH};
 use uuid::Uuid;
 
-pub fn router() -> axum::Router<state::State> {
-    axum::Router::new()
-        .route("/hasJoined", on(MethodFilter::GET, has_joined))
-        .route("/profile/:uuid", on(MethodFilter::GET, profile_by_uuid))
+pub fn router() -> Router<state::State> {
+    Router::new().nest(
+        "/session/minecraft",
+        Router::new()
+            .route("/hasJoined", on(MethodFilter::GET, has_joined))
+            .route("/profile/:uuid", on(MethodFilter::GET, profile_by_uuid)),
+    )
 }
 
 async fn has_joined(

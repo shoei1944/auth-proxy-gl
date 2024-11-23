@@ -43,10 +43,7 @@ async fn _main(config: AppConfig) -> Result<(), Box<dyn Error>> {
             axum::Router::new()
                 .merge(routes::root::router())
                 .nest("/api", routes::api::router())
-                .nest(
-                    "/sessionserver/session/minecraft",
-                    routes::sessionserver_session_minecraft::router(),
-                ),
+                .nest("/sessionserver", routes::sessionserver::router()),
         )
         .with_state(state::State {
             config: Arc::new(config),

@@ -5,11 +5,11 @@ use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::routing::{on, MethodFilter};
-use axum::Json;
+use axum::{Json, Router};
 use futures_util::{future, StreamExt};
 
-pub fn router() -> axum::Router<state::State> {
-    axum::Router::new().route(
+pub fn router() -> Router<state::State> {
+    Router::new().route(
         "/profiles/minecraft",
         on(MethodFilter::POST, profiles_by_usernames),
     )

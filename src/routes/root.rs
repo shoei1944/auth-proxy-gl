@@ -2,10 +2,10 @@ use crate::injector::types::response;
 use crate::state;
 use axum::extract::State;
 use axum::routing::{on, MethodFilter};
-use axum::Json;
+use axum::{Json, Router};
 
-pub fn router() -> axum::Router<state::State> {
-    axum::Router::new().route("/", on(MethodFilter::GET, root))
+pub fn router() -> Router<state::State> {
+    Router::new().route("/", on(MethodFilter::GET, root))
 }
 
 async fn root(State(state): State<state::State>) -> Json<response::root::Root> {
