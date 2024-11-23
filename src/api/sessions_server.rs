@@ -29,7 +29,7 @@ async fn has_joined(
         return StatusCode::NO_CONTENT.into_response();
     };
 
-    let Some(check_server) = ({
+    let Ok(check_server) = ({
         let socket = socket.lock().await;
 
         socket
@@ -57,7 +57,7 @@ async fn profile_by_uuid(
         return StatusCode::NO_CONTENT.into_response();
     };
 
-    let Some(profile) = ({
+    let Ok(profile) = ({
         let socket = socket.lock().await;
 
         socket.get_profile_by_uuid(uuid).await

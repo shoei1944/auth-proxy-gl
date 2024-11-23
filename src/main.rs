@@ -42,7 +42,7 @@ async fn _main(config: AppConfig) -> Result<(), Box<dyn Error>> {
     };
 
     let router = axum::Router::new()
-        .nest("/:server_id", api::root::routes())
+        .nest("/", api::root::routes())
         .nest(
             "/:server_id/sessionserver/session/minecraft",
             api::sessions_server::routes(),
@@ -80,7 +80,11 @@ async fn connect_sockets(config: &AppConfig) -> state::Sockets {
             name: "checkServer".to_string(),
             value: data.token.clone(),
         };
-        socket.restore_token(pair, false).await;
+        if let Err(err) = socket.restore_token(pair, false).await {
+            error!("Error with restore token: {:?}", err);
+            
+            continue;
+        };
 
         info!("Connected ({} - {})", server_id, data.api);
         sockets.insert(server_id, socket)

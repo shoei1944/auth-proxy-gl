@@ -1,4 +1,6 @@
+use crate::launcher::error;
 use crate::launcher::types::{request, response};
+use dashmap::DashMap;
 use futures_util::stream::{SplitSink, SplitStream};
 use futures_util::{SinkExt, StreamExt, TryStreamExt};
 use std::collections::HashMap;
@@ -14,7 +16,7 @@ use uuid::Uuid;
 
 pub struct Socket {
     sender: ActorSender,
-    handle: JoinHandle<()>,
+    actor_handle: JoinHandle<()>,
 }
 
 impl Socket {
@@ -22,71 +24,71 @@ impl Socket {
         let (ws_stream, _) = tokio_tungstenite::connect_async(addr.into()).await?;
         let (ws_sender, ws_receiver) = ws_stream.split();
 
-        let (sender, receiver) = mpsc::channel::<ActorMessage>(64);
-        let mut inner = SocketActor::new(ws_sender, ws_receiver, receiver);
+        let (sender, mut receiver) = mpsc::channel::<ActorMessage>(64);
+        let actor = Arc::new(SocketActor::new(ws_sender, ws_receiver));
 
-        let handle = tokio::spawn(async move {
-            while let Some(msg) = inner.receiver.recv().await {
-                inner.handle_message(msg).await;
+        let actor_handle = tokio::spawn(async move {
+            while let Some(msg) = receiver.recv().await {
+                let actor = actor.clone();
+
+                tokio::spawn(async move {
+                    let (tx, rx) = oneshot::channel();
+                    let request_id = msg.request.id;
+
+                    actor.callbacks.insert(request_id, tx);
+
+                    if let Err(err) = actor.handle_message(msg, rx).await {
+                        error!("Error with handle actor message: {:?}", err);
+                    };
+
+                    actor.callbacks.remove(&request_id);
+                });
             }
         });
 
-        Ok(Socket { sender, handle })
+        Ok(Socket {
+            sender,
+            actor_handle,
+        })
     }
 
     pub async fn restore_token(
         &self,
         pair: request::restore_token::Pair,
         user_info: bool,
-    ) -> Option<response::restore_token::RestoreToken> {
-        let (tx, rx) = oneshot::channel();
-
-        let _ = self
-            .sender
-            .send(ActorMessage {
-                sender: tx,
-                request: request::Request {
-                    id: Uuid::new_v4(),
-                    body: request::any::Kind::RestoreToken(request::restore_token::RestoreToken {
-                        extended: HashMap::from([(pair.name, pair.value)]),
-                        need_user_info: user_info,
-                    }),
-                },
+    ) -> Result<response::restore_token::RestoreToken, error::Error> {
+        let response = self
+            .send_to_actor(request::Request {
+                id: Uuid::new_v4(),
+                body: request::any::Kind::RestoreToken(request::restore_token::RestoreToken {
+                    extended: HashMap::from([(pair.name, pair.value)]),
+                    need_user_info: user_info,
+                }),
             })
-            .await;
+            .await?;
 
-        rx.await.unwrap().and_then(|v| {
-            if let response::any::Kind::RestoreToken(check_server) = v {
-                Some(check_server)
-            } else {
-                None
-            }
-        })
+        if let response::any::Kind::RestoreToken(restore_token) = response {
+            Ok(restore_token)
+        } else {
+            Err(error::Error::UnexpectedResponse(response))
+        }
     }
 
-    pub async fn get_public_key(&self) -> Option<response::get_public_key::GetPublicKey> {
-        let (tx, rx) = oneshot::channel();
-
-        let _ = self
-            .sender
-            .send(ActorMessage {
-                sender: tx,
-                request: request::Request {
-                    id: Uuid::new_v4(),
-                    body: request::any::Kind::GetPublicKey(
-                        request::get_public_key::GetPublicKey {},
-                    ),
-                },
+    pub async fn get_public_key(
+        &self,
+    ) -> Result<response::get_public_key::GetPublicKey, error::Error> {
+        let response = self
+            .send_to_actor(request::Request {
+                id: Uuid::new_v4(),
+                body: request::any::Kind::GetPublicKey(request::get_public_key::GetPublicKey {}),
             })
-            .await;
+            .await?;
 
-        rx.await.unwrap().and_then(|v| {
-            if let response::any::Kind::GetPublicKey(check_server) = v {
-                Some(check_server)
-            } else {
-                None
-            }
-        })
+        if let response::any::Kind::GetPublicKey(get_public_key) = response {
+            Ok(get_public_key)
+        } else {
+            Err(error::Error::UnexpectedResponse(response))
+        }
     }
 
     pub async fn check_server(
@@ -95,67 +97,72 @@ impl Socket {
         server_id: impl Into<String>,
         need_hardware: bool,
         need_properties: bool,
-    ) -> Option<response::check_server::CheckServer> {
-        let (tx, rx) = oneshot::channel();
-
-        let _ = self
-            .sender
-            .send(ActorMessage {
-                sender: tx,
-                request: request::Request {
-                    id: Uuid::new_v4(),
-                    body: request::any::Kind::CheckServer(request::check_server::CheckServer {
-                        username: username.into(),
-                        server_id: server_id.into(),
-                        need_hardware,
-                        need_properties,
-                    }),
-                },
+    ) -> Result<response::check_server::CheckServer, error::Error> {
+        let response = self
+            .send_to_actor(request::Request {
+                id: Uuid::new_v4(),
+                body: request::any::Kind::CheckServer(request::check_server::CheckServer {
+                    username: username.into(),
+                    server_id: server_id.into(),
+                    need_hardware,
+                    need_properties,
+                }),
             })
-            .await;
+            .await?;
 
-        rx.await.unwrap().and_then(|v| {
-            if let response::any::Kind::CheckServer(check_server) = v {
-                Some(check_server)
-            } else {
-                None
-            }
-        })
+        if let response::any::Kind::CheckServer(check_server) = response {
+            Ok(check_server)
+        } else {
+            Err(error::Error::UnexpectedResponse(response))
+        }
     }
 
     pub async fn get_profile_by_uuid(
         &self,
         uuid: Uuid,
-    ) -> Option<response::get_profile_by_uuid::GetProfileByUuid> {
+    ) -> Result<response::get_profile_by_uuid::GetProfileByUuid, error::Error> {
+        let response = self
+            .send_to_actor(request::Request {
+                id: Uuid::new_v4(),
+                body: request::any::Kind::GetProfileByUuid(
+                    request::get_profile_by_uuid::GetProfileByUuid { uuid },
+                ),
+            })
+            .await?;
+
+        if let response::any::Kind::GetProfileByUuid(get_profile_by_uuid) = response {
+            Ok(get_profile_by_uuid)
+        } else {
+            Err(error::Error::UnexpectedResponse(response))
+        }
+    }
+
+    async fn send_to_actor(
+        &self,
+        request: request::any::Any,
+    ) -> Result<response::any::Kind, error::Error> {
         let (tx, rx) = oneshot::channel();
 
-        let _ = self
-            .sender
+        self.sender
             .send(ActorMessage {
                 sender: tx,
-                request: request::Request {
-                    id: Uuid::new_v4(),
-                    body: request::any::Kind::GetProfileByUuid(
-                        request::get_profile_by_uuid::GetProfileByUuid { uuid },
-                    ),
-                },
+                request,
             })
-            .await;
+            .await
+            .map_err(|err| error::ActorError::from(err))?;
 
-        rx.await.unwrap().and_then(|v| {
-            if let response::any::Kind::GetProfileByUuid(check_server) = v {
-                Some(check_server)
-            } else {
-                None
-            }
-        })
+        rx.await
+            .map_err(|err| error::ActorError::from(err))
+            .map_err(|err| err.into())
     }
 }
 
 struct ActorMessage {
-    sender: oneshot::Sender<Option<response::any::Kind>>,
+    sender: oneshot::Sender<response::any::Kind>,
     request: request::any::Any,
 }
+
+type Callbacks = DashMap<Uuid, oneshot::Sender<response::any::Kind>>;
 
 type ActorSender = mpsc::Sender<ActorMessage>;
 type ActorReceiver = mpsc::Receiver<ActorMessage>;
@@ -164,61 +171,46 @@ type WebSocketSender = SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, tun
 type WebSocketReceiver = SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>>;
 
 struct SocketActor {
-    callbacks: Arc<Mutex<HashMap<Uuid, oneshot::Sender<response::any::Kind>>>>,
-    ws_sender: WebSocketSender,
-    receiver: ActorReceiver,
-    handle: JoinHandle<()>,
+    callbacks: Arc<Callbacks>,
+    ws_sender: Mutex<WebSocketSender>,
+    receiver_handle: JoinHandle<()>,
 }
 
 impl SocketActor {
-    pub fn new(
-        ws_sender: WebSocketSender,
-        ws_receiver: WebSocketReceiver,
-        receiver: ActorReceiver,
-    ) -> SocketActor {
-        let callbacks = Arc::new(Mutex::new(HashMap::new()));
-        let handle = tokio::spawn(start_receiver_handle(ws_receiver, callbacks.clone()));
+    pub fn new(ws_sender: WebSocketSender, ws_receiver: WebSocketReceiver) -> SocketActor {
+        let callbacks = Arc::new(DashMap::new());
+        let receiver_handle = tokio::spawn(start_receiver_handle(ws_receiver, callbacks.clone()));
 
         SocketActor {
             callbacks,
-            ws_sender,
-            receiver,
-            handle,
+            ws_sender: Mutex::new(ws_sender),
+            receiver_handle,
         }
     }
 
-    pub async fn handle_message(&mut self, message: ActorMessage) {
-        let (tx, rx) = oneshot::channel();
-        let request_id = message.request.id;
-        {
-            let mut callbacks = self.callbacks.lock().await;
-            callbacks.insert(request_id, tx);
-        }
+    pub async fn handle_message(
+        &self,
+        message: ActorMessage,
+        receiver: oneshot::Receiver<response::any::Kind>,
+    ) -> Result<(), error::ActorError> {
+        let json_request = serde_json::to_string(&message.request)?;
+        info!("Request: {}", json_request);
 
-        if let Ok(json_request) = serde_json::to_string(&message.request) {
-            info!("Request: {}", json_request);
+        let _ = {
+            let mut sender = self.ws_sender.lock().await;
 
-            let _ = self
-                .ws_sender
-                .send(tungstenite::Message::Text(json_request))
-                .await;
+            sender.send(tungstenite::Message::Text(json_request)).await
+        };
+        let response = time::timeout(Duration::from_secs(10), receiver).await??;
 
-            if let Ok(Ok(v)) = time::timeout(Duration::from_secs(10), rx).await {
-                let _ = message.sender.send(Some(v));
-            }
-        }
-
-        {
-            let mut callbacks = self.callbacks.lock().await;
-            callbacks.remove(&request_id);
-        }
+        message
+            .sender
+            .send(response)
+            .map_err(|_| error::ActorError::Send)
     }
 }
 
-async fn start_receiver_handle(
-    receiver: WebSocketReceiver,
-    callbacks: Arc<Mutex<HashMap<Uuid, oneshot::Sender<response::any::Kind>>>>,
-) {
+async fn start_receiver_handle(receiver: WebSocketReceiver, callbacks: Arc<Callbacks>) {
     let _ = receiver
         .try_for_each_concurrent(64, |message| {
             let callbacks = callbacks.clone();
@@ -238,11 +230,9 @@ async fn start_receiver_handle(
                     }
                 };
 
-                info!("Response id: {}", response.id);
-                let mut callbacks = callbacks.lock().await;
                 let _ = callbacks
                     .remove(&response.id)
-                    .map(|v| v.send(response.body));
+                    .map(|(_, sender)| sender.send(response.body));
 
                 Ok(())
             }
