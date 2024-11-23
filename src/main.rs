@@ -38,7 +38,7 @@ async fn _main(config: AppConfig) -> Result<(), Box<dyn Error>> {
     let sockets = connect_sockets(&config).await;
 
     let router = axum::Router::new()
-        .nest("/", api::root::routes())
+        .nest("/:server_id", api::root::routes())
         .nest(
             "/:server_id/sessionserver/session/minecraft",
             api::sessions_server::routes(),
