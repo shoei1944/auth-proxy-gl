@@ -6,8 +6,8 @@ edition = "2021"
 [dependencies]
 axum = "0.7.9"
 base64 = "0.22.1"
-config = "0.14.1"
 dashmap = "6.1.0"
+figment = { version = "0.10.19", features = ["json"] }
 futures = "0.3.31"
 futures-util = "0.3.31"
 serde = { version = "1.0.215", features = ["derive"] }

@@ -149,10 +149,10 @@ impl Socket {
                 request,
             })
             .await
-            .map_err(|err| error::ActorError::from(err))?;
+            .map_err(error::ActorError::from)?;
 
         rx.await
-            .map_err(|err| error::ActorError::from(err))
+            .map_err(error::ActorError::from)
             .map_err(|err| err.into())
     }
 }

@@ -4,7 +4,7 @@ use std::collections::HashMap;
 #[derive(Serialize, Deserialize, Debug, Default)]
 pub struct Config {
     pub api: Api,
-    pub keys: Keys,
+    pub keys: KeyPair,
     pub servers: HashMap<String, Server>,
 }
 
@@ -15,7 +15,7 @@ pub struct Api {
 }
 
 #[derive(Serialize, Deserialize, Debug, Default)]
-pub struct Keys {
+pub struct KeyPair {
     pub private: String,
     pub public: String,
 }
