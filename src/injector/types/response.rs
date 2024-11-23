@@ -56,14 +56,13 @@ pub mod profile {
 
         pub mod textures {
             use serde::{Deserialize, Serialize};
-            use uuid::Uuid;
 
             #[derive(Serialize, Deserialize, Debug)]
             pub struct Textures {
                 pub timestamp: u128,
 
                 #[serde(rename = "profileId")]
-                pub profile_id: Uuid,
+                pub profile_id: String,
 
                 #[serde(rename = "profileName")]
                 pub profile_name: String,

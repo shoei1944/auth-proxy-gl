@@ -84,7 +84,7 @@ async fn profile_by_uuid(
 
     let textures = textures::Textures {
         timestamp: now.as_millis(),
-        profile_id: profile.player_profile.uuid,
+        profile_id: profile.player_profile.uuid.simple().to_string(),
         profile_name: profile.player_profile.username.clone(),
         signature_required: !query.unsigned,
         textures: textures::kind::Kind { skin, cape },

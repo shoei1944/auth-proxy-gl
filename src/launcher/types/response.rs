@@ -97,76 +97,83 @@ pub mod check_server {
 }
 
 pub mod get_profile_by_uuid {
+    use crate::launcher::types::response::base;
     use serde::{Deserialize, Serialize};
-    use uuid::Uuid;
 
     #[derive(Serialize, Deserialize, Debug)]
     pub struct GetProfileByUuid {
         #[serde(rename = "playerProfile")]
-        pub player_profile: Profile,
-    }
-
-    #[derive(Serialize, Deserialize, Debug)]
-    pub struct Profile {
-        pub uuid: Uuid,
-        pub username: String,
-        pub assets: Assets,
-    }
-
-    #[derive(Serialize, Deserialize, Debug)]
-    pub struct Assets {
-        #[serde(rename = "SKIN", skip_serializing_if = "Option::is_none")]
-        pub skin: Option<skin::Skin>,
-
-        #[serde(rename = "CAPE", skip_serializing_if = "Option::is_none")]
-        pub cape: Option<cape::Cape>,
-    }
-
-    pub mod skin {
-        use serde::{Deserialize, Serialize};
-
-        #[derive(Serialize, Deserialize, Debug)]
-        pub struct Skin {
-            pub url: String,
-            pub digest: String,
-
-            #[serde(skip_serializing_if = "Option::is_none")]
-            pub metadata: Option<metadata::Metadata>,
-        }
-
-        pub mod metadata {
-            use serde::{Deserialize, Serialize};
-
-            #[derive(Serialize, Deserialize, Debug)]
-            pub struct Metadata {
-                pub model: Model,
-            }
-
-            #[derive(Serialize, Deserialize, Debug)]
-            pub enum Model {
-                #[serde(rename = "slim")]
-                Slim,
-            }
-        }
-    }
-
-    pub mod cape {
-        use serde::{Deserialize, Serialize};
-
-        #[derive(Serialize, Deserialize, Debug)]
-        pub struct Cape {
-            pub url: String,
-        }
+        pub player_profile: base::profile::Profile,
     }
 }
 
 pub mod get_profile_by_username {
-    use crate::launcher::types::response::get_profile_by_uuid;
+    use crate::launcher::types::response::base;
     use serde::{Deserialize, Serialize};
 
     #[derive(Serialize, Deserialize, Debug)]
     pub struct GetProfileByUsername {
         #[serde(rename = "playerProfile")]
-        pub player_profile: get_profile_by_uuid::Profile,
+        pub player_profile: base::profile::Profile,
+    }
+}
+
+pub mod base {
+    pub mod profile {
+        use serde::{Deserialize, Serialize};
+        use uuid::Uuid;
+
+        #[derive(Serialize, Deserialize, Debug)]
+        pub struct Profile {
+            pub uuid: Uuid,
+            pub username: String,
+            pub assets: Assets,
+        }
+
+        #[derive(Serialize, Deserialize, Debug)]
+        pub struct Assets {
+            #[serde(rename = "SKIN", skip_serializing_if = "Option::is_none")]
+            pub skin: Option<skin::Skin>,
+
+            #[serde(rename = "CAPE", skip_serializing_if = "Option::is_none")]
+            pub cape: Option<cape::Cape>,
+        }
+
+        pub mod skin {
+            use serde::{Deserialize, Serialize};
+
+            #[derive(Serialize, Deserialize, Debug)]
+            pub struct Skin {
+                pub url: String,
+                pub digest: String,
+
+                #[serde(skip_serializing_if = "Option::is_none")]
+                pub metadata: Option<metadata::Metadata>,
+            }
+
+            pub mod metadata {
+                use serde::{Deserialize, Serialize};
+
+                #[derive(Serialize, Deserialize, Debug)]
+                pub struct Metadata {
+                    pub model: Model,
+                }
+
+                #[derive(Serialize, Deserialize, Debug)]
+                pub enum Model {
+                    #[serde(rename = "slim")]
+                    Slim,
+                }
+            }
+        }
+
+        pub mod cape {
+            use serde::{Deserialize, Serialize};
+
+            #[derive(Serialize, Deserialize, Debug)]
+            pub struct Cape {
+                pub url: String,
+            }
+        }
     }
 }
