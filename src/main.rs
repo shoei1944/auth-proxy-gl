@@ -24,7 +24,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .join(providers::Json::file(CONFIG_FILE))
         .extract::<AppConfig>()?;
 
-    let rt = runtime::Builder::new_current_thread()
+    let rt = runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;
 
