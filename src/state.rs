@@ -2,7 +2,7 @@ use crate::config::Config;
 use crate::{config, launcher};
 use std::collections::HashMap;
 use std::sync::Arc;
-use tracing::{error, info};
+use tracing::{error, info, span, Level};
 
 #[derive(Clone)]
 pub struct State {
@@ -22,6 +22,8 @@ impl Sockets {
         };
 
         for (id, server) in servers {
+            let span = span!(Level::INFO, "Sockets::from_servers", id, api = server.api).entered();
+
             let socket = match launcher::Socket::new(&server.api).await {
                 Ok(v) => v,
                 Err(err) => {
@@ -51,6 +53,8 @@ impl Sockets {
             }
 
             info!("Connected");
+            span.exit();
+
             sockets.insert(id, socket)
         }
 

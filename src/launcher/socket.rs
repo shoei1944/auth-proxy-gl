@@ -11,7 +11,7 @@ use tokio::sync::{mpsc, oneshot, Mutex};
 use tokio::task::JoinHandle;
 use tokio::time;
 use tokio_tungstenite::{tungstenite, MaybeTlsStream, WebSocketStream};
-use tracing::{error, info};
+use tracing::{debug, error};
 use uuid::Uuid;
 
 macro_rules! extract_response {
@@ -231,7 +231,7 @@ impl SocketActor {
         receiver: oneshot::Receiver<response::any::Kind>,
     ) -> Result<(), error::ActorError> {
         let json_request = serde_json::to_string(&message.request)?;
-        info!("Request: {}", json_request);
+        debug!("Request: {}", json_request);
 
         let _ = {
             let mut sender = self.ws_sender.lock().await;
@@ -257,11 +257,11 @@ async fn start_receiver_handle(receiver: WebSocketReceiver, callbacks: Arc<WsReq
                     return Ok(());
                 };
 
-                info!("Response: {}", body);
+                debug!("Response: {}", body);
                 let response = match serde_json::from_str::<response::any::Any>(&body) {
                     Ok(v) => v,
                     Err(err) => {
-                        error!("Error with deserialize from injector: {}", err);
+                        debug!("Error with deserialize message from socket: {}", err);
 
                         return Ok(());
                     }

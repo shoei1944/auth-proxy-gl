@@ -8,11 +8,23 @@ use std::fs;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::{net, runtime, signal};
+use tracing::{debug, info};
+use tracing_subscriber::filter::LevelFilter;
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
+use tracing_subscriber::{fmt, EnvFilter};
 
 const CONFIG_FILE: &str = "config.json";
 
 fn main() -> Result<(), Box<dyn Error>> {
-    tracing_subscriber::fmt().init();
+    let env_filter = EnvFilter::builder()
+        .with_default_directive(LevelFilter::INFO.into())
+        .with_env_var("LOGGING_LEVEL")
+        .from_env()?;
+    tracing_subscriber::registry()
+        .with(fmt::layer())
+        .with(env_filter)
+        .init();
 
     if !fs::exists(CONFIG_FILE)? {
         let default_config = serde_json::to_string_pretty(&AppConfig::default())?;
@@ -32,6 +44,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 async fn _main(config: AppConfig) -> Result<(), Box<dyn Error>> {
     let addr = format!("{}:{}", config.api.host, config.api.port).parse::<SocketAddr>()?;
     let listener = net::TcpListener::bind(addr).await?;
+    info!("Proxy listening on address {}", addr);
 
     let sockets = Sockets::from_servers(&config.servers).await;
 
@@ -52,7 +65,7 @@ async fn _main(config: AppConfig) -> Result<(), Box<dyn Error>> {
         .with_graceful_shutdown(async move {
             signal::ctrl_c().await.unwrap();
 
-            println!("Ctrl^C signal received. Quitting.");
+            debug!("Ctrl^C signal received. Quitting.");
         })
         .await?;
 
