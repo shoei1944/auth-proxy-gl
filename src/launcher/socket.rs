@@ -14,6 +14,16 @@ use tokio_tungstenite::{tungstenite, MaybeTlsStream, WebSocketStream};
 use tracing::{error, info};
 use uuid::Uuid;
 
+macro_rules! extract_response {
+    ($response:expr, $kind:path) => {
+        if let $kind(value) = $response {
+            Ok(value)
+        } else {
+            Err(error::Error::UnexpectedResponse($response))
+        }
+    };
+}
+
 pub struct Socket {
     sender: ActorSender,
     actor_handle: JoinHandle<()>,
@@ -24,27 +34,10 @@ impl Socket {
         let (ws_stream, _) = tokio_tungstenite::connect_async(addr.into()).await?;
         let (ws_sender, ws_receiver) = ws_stream.split();
 
-        let (sender, mut receiver) = mpsc::channel::<ActorMessage>(64);
+        let (sender, receiver) = mpsc::channel::<ActorMessage>(64);
         let actor = Arc::new(SocketActor::new(ws_sender, ws_receiver));
 
-        let actor_handle = tokio::spawn(async move {
-            while let Some(msg) = receiver.recv().await {
-                let actor = actor.clone();
-
-                tokio::spawn(async move {
-                    let (tx, rx) = oneshot::channel();
-                    let request_id = msg.request.id;
-
-                    actor.callbacks.insert(request_id, tx);
-
-                    if let Err(err) = actor.handle_message(msg, rx).await {
-                        error!("Error with handle actor message: {:?}", err);
-                    };
-
-                    actor.callbacks.remove(&request_id);
-                });
-            }
-        });
+        let actor_handle = tokio::spawn(start_actor_handle(actor, receiver));
 
         Ok(Socket {
             sender,
@@ -67,11 +60,7 @@ impl Socket {
             })
             .await?;
 
-        if let response::any::Kind::RestoreToken(restore_token) = response {
-            Ok(restore_token)
-        } else {
-            Err(error::Error::UnexpectedResponse(response))
-        }
+        extract_response!(response, response::any::Kind::RestoreToken)
     }
 
     pub async fn get_public_key(
@@ -84,11 +73,7 @@ impl Socket {
             })
             .await?;
 
-        if let response::any::Kind::GetPublicKey(get_public_key) = response {
-            Ok(get_public_key)
-        } else {
-            Err(error::Error::UnexpectedResponse(response))
-        }
+        extract_response!(response, response::any::Kind::GetPublicKey)
     }
 
     pub async fn check_server(
@@ -110,11 +95,7 @@ impl Socket {
             })
             .await?;
 
-        if let response::any::Kind::CheckServer(check_server) = response {
-            Ok(check_server)
-        } else {
-            Err(error::Error::UnexpectedResponse(response))
-        }
+        extract_response!(response, response::any::Kind::CheckServer)
     }
 
     pub async fn get_profile_by_uuid(
@@ -130,11 +111,7 @@ impl Socket {
             })
             .await?;
 
-        if let response::any::Kind::GetProfileByUuid(get_profile_by_uuid) = response {
-            Ok(get_profile_by_uuid)
-        } else {
-            Err(error::Error::UnexpectedResponse(response))
-        }
+        extract_response!(response, response::any::Kind::GetProfileByUuid)
     }
 
     pub async fn get_profile_by_username(
@@ -152,11 +129,7 @@ impl Socket {
             })
             .await?;
 
-        if let response::any::Kind::GetProfileByUsername(get_profile_by_username) = response {
-            Ok(get_profile_by_username)
-        } else {
-            Err(error::Error::UnexpectedResponse(response))
-        }
+        extract_response!(response, response::any::Kind::GetProfileByUsername)
     }
 
     async fn send_to_actor(
@@ -179,20 +152,40 @@ impl Socket {
     }
 }
 
+async fn start_actor_handle(actor: Arc<SocketActor>, mut receiver: ActorReceiver) {
+    while let Some(msg) = receiver.recv().await {
+        let actor = actor.clone();
+
+        tokio::spawn(async move {
+            let (tx, rx) = oneshot::channel();
+            let request_id = msg.request.id;
+
+            actor.callbacks.insert(request_id, tx);
+
+            if let Err(err) = actor.handle_message(msg, rx).await {
+                error!("Error with handle actor message: {:?}", err);
+            };
+
+            actor.callbacks.remove(&request_id);
+        });
+    }
+}
+
 struct ActorMessage {
     sender: oneshot::Sender<response::any::Kind>,
     request: request::any::Any,
 }
 
-type Callbacks = DashMap<Uuid, oneshot::Sender<response::any::Kind>>;
+type WsRequestsCallbacks = DashMap<Uuid, oneshot::Sender<response::any::Kind>>;
 
 type ActorSender = mpsc::Sender<ActorMessage>;
+type ActorReceiver = mpsc::Receiver<ActorMessage>;
 
 type WebSocketSender = SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, tungstenite::Message>;
 type WebSocketReceiver = SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>>;
 
 struct SocketActor {
-    callbacks: Arc<Callbacks>,
+    callbacks: Arc<WsRequestsCallbacks>,
     ws_sender: Mutex<WebSocketSender>,
     receiver_handle: JoinHandle<()>,
 }
@@ -231,7 +224,7 @@ impl SocketActor {
     }
 }
 
-async fn start_receiver_handle(receiver: WebSocketReceiver, callbacks: Arc<Callbacks>) {
+async fn start_receiver_handle(receiver: WebSocketReceiver, callbacks: Arc<WsRequestsCallbacks>) {
     let _ = receiver
         .try_for_each_concurrent(64, |message| {
             let callbacks = callbacks.clone();
