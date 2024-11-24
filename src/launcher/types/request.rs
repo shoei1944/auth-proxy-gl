@@ -14,8 +14,8 @@ pub struct Request<T: Serialize + DeserializeOwned> {
 
 pub mod any {
     use crate::launcher::types::request::{
-        check_server, get_profile_by_username, get_profile_by_uuid, get_public_key, restore_token,
-        Request,
+        batch_profiles_by_usernames, check_server, get_profile_by_username, get_profile_by_uuid,
+        get_public_key, restore_token, Request,
     };
     use serde::{Deserialize, Serialize};
 
@@ -38,6 +38,9 @@ pub mod any {
 
         #[serde(rename = "profileByUsername")]
         GetProfileByUsername(get_profile_by_username::GetProfileByUsername),
+
+        #[serde(rename = "batchProfileByUsername")]
+        BatchProfilesByUsernames(batch_profiles_by_usernames::BatchProfilesByUsernames),
     }
 }
 
@@ -99,6 +102,20 @@ pub mod get_profile_by_username {
 
     #[derive(Serialize, Deserialize, Debug)]
     pub struct GetProfileByUsername {
+        pub username: String,
+    }
+}
+
+pub mod batch_profiles_by_usernames {
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Serialize, Deserialize, Debug)]
+    pub struct BatchProfilesByUsernames {
+        pub list: Vec<Entry>,
+    }
+
+    #[derive(Serialize, Deserialize, Debug)]
+    pub struct Entry {
         pub username: String,
     }
 }

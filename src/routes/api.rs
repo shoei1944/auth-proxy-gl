@@ -6,7 +6,6 @@ use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::routing::{on, MethodFilter};
 use axum::{Json, Router};
-use futures_util::{future, StreamExt};
 
 pub fn router() -> Router<state::State> {
     Router::new().route(
@@ -24,22 +23,16 @@ async fn profiles_by_usernames(
         return StatusCode::NO_CONTENT.into_response();
     };
 
-    let prepared = futures::stream::iter(usernames)
-        .map(|username| {
-            let socket = socket.clone();
+    let Ok(profiles) = socket.batch_profiles_by_usernames(usernames).await else {
+        return StatusCode::NO_CONTENT.into_response();
+    };
 
-            async move { socket.get_profile_by_username(username).await }
-        })
-        .collect::<Vec<_>>()
-        .await;
-
-    let response = future::join_all(prepared)
-        .await
+    let response = profiles
+        .player_profiles
         .into_iter()
-        .filter_map(|maybe_profile| maybe_profile.ok())
         .map(|profile| profile::Profile {
-            id: profile.player_profile.uuid.simple().to_string(),
-            name: profile.player_profile.username,
+            id: profile.uuid.simple().to_string(),
+            name: profile.username,
             properties: Vec::new(),
         })
         .collect::<Vec<_>>();

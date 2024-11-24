@@ -132,6 +132,29 @@ impl Socket {
         extract_response!(response, response::any::Kind::GetProfileByUsername)
     }
 
+    pub async fn batch_profiles_by_usernames(
+        &self,
+        usernames: Vec<impl Into<String>>,
+    ) -> Result<response::batch_profiles_by_usernames::BatchProfilesByUsernames, error::Error> {
+        let response = self
+            .send_to_actor(request::Request {
+                id: Uuid::new_v4(),
+                body: request::any::Kind::BatchProfilesByUsernames(
+                    request::batch_profiles_by_usernames::BatchProfilesByUsernames {
+                        list: usernames
+                            .into_iter()
+                            .map(|username| request::batch_profiles_by_usernames::Entry {
+                                username: username.into(),
+                            })
+                            .collect::<Vec<_>>(),
+                    },
+                ),
+            })
+            .await?;
+
+        extract_response!(response, response::any::Kind::BatchProfilesByUsernames)
+    }
+
     async fn send_to_actor(
         &self,
         request: request::any::Any,
