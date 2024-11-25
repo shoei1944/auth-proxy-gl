@@ -2,7 +2,6 @@ use crate::config::Config;
 use crate::{config, launcher};
 use std::collections::HashMap;
 use std::sync::Arc;
-use tracing::{error, info, span, Level};
 
 #[derive(Clone)]
 pub struct State {

@@ -30,6 +30,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         let default_config = serde_json::to_string_pretty(&AppConfig::default())?;
 
         fs::write(CONFIG_FILE, default_config)?;
+
+        return Ok(());
     }
 
     let config = figment::Figment::new()
