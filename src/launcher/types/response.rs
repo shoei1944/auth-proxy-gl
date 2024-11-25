@@ -53,7 +53,19 @@ pub mod error {
     #[derive(Serialize, Deserialize, Debug)]
     pub struct Error {
         #[serde(rename = "error")]
-        pub kind: String,
+        pub kind: Kind,
+    }
+
+    #[derive(Serialize, Deserialize, Debug)]
+    pub enum Kind {
+        #[serde(rename = "User not found")]
+        UserNotFound,
+
+        #[serde(rename = "Permissions denied")]
+        PermissionsDenied,
+        
+        #[serde(untagged)]
+        Other(String)
     }
 }
 

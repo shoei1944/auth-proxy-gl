@@ -3,7 +3,7 @@ use crate::injector::types::response::profile;
 use crate::injector::types::response::profile::property::textures;
 use crate::injector::types::response::profile::property::textures::kind::skin::metadata;
 use crate::injector::types::response::profile::property::textures::kind::{cape, skin};
-use crate::state;
+use crate::{launcher, state};
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
@@ -28,12 +28,22 @@ async fn has_joined(
     Path(server_id): Path<String>,
     Query(query): Query<request::has_joined::Query>,
 ) -> impl IntoResponse {
+    let Some(current_server) = state.config.servers.get(&server_id) else {
+        return StatusCode::NO_CONTENT.into_response();
+    };
     let Some(socket) = state.sockets.socket(server_id) else {
         return StatusCode::NO_CONTENT.into_response();
     };
 
-    let Ok(check_server) = socket
-        .check_server(query.username, query.server_id, false, false)
+    let Ok(check_server) =
+        launcher::socket::execute_with_token_restore(socket.clone(), current_server, || {
+            socket.check_server(
+                query.username.clone(),
+                query.server_id.clone(),
+                false,
+                false,
+            )
+        })
         .await
     else {
         return StatusCode::NO_CONTENT.into_response();
@@ -53,11 +63,19 @@ async fn profile_by_uuid(
     Path((server_id, uuid)): Path<(String, Uuid)>,
     Query(query): Query<request::profile_by_uuid::Query>,
 ) -> impl IntoResponse {
+    let Some(current_server) = state.config.servers.get(&server_id) else {
+        return StatusCode::NO_CONTENT.into_response();
+    };
     let Some(socket) = state.sockets.socket(server_id) else {
         return StatusCode::NO_CONTENT.into_response();
     };
 
-    let Ok(profile) = socket.get_profile_by_uuid(uuid).await else {
+    let Ok(profile) =
+        launcher::socket::execute_with_token_restore(socket.clone(), current_server, || {
+            socket.get_profile_by_uuid(uuid)
+        })
+        .await
+    else {
         return StatusCode::NO_CONTENT.into_response();
     };
 

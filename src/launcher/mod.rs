@@ -1,4 +1,4 @@
-mod socket;
+pub mod socket;
 pub mod types;
 pub mod error;
 

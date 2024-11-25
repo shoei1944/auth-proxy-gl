@@ -22,40 +22,7 @@ impl Sockets {
         };
 
         for (id, server) in servers {
-            let span = span!(Level::INFO, "Sockets::from_servers", id, api = server.api).entered();
-
-            let socket = match launcher::Socket::new(&server.api).await {
-                Ok(v) => v,
-                Err(err) => {
-                    error!("Error with connecting to socket: {}", err);
-
-                    continue;
-                }
-            };
-
-            let pair = launcher::types::request::restore_token::Pair {
-                name: "checkServer".to_string(),
-                value: server.token.clone(),
-            };
-            match socket.restore_token(pair, false).await {
-                Ok(v) => {
-                    if !v.invalid_tokens.is_empty() {
-                        error!("Invalid tokens received: {:?}", v.invalid_tokens);
-
-                        continue;
-                    }
-                }
-                Err(err) => {
-                    error!("Error with send restore token request: {:?}", err);
-
-                    continue;
-                }
-            }
-
-            info!("Connected");
-            span.exit();
-
-            sockets.insert(id, socket)
+            sockets.insert(id, launcher::Socket::new(&server.api))
         }
 
         sockets
@@ -67,5 +34,9 @@ impl Sockets {
 
     pub fn socket(&self, id: impl Into<String>) -> Option<Arc<launcher::Socket>> {
         self.inner.get(&id.into()).cloned()
+    }
+
+    pub fn inner(&self) -> impl Iterator<Item = &Arc<launcher::Socket>> {
+        self.inner.values()
     }
 }

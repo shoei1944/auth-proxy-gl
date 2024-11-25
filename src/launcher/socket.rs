@@ -1,15 +1,16 @@
+use crate::config;
 use crate::launcher::error;
 use crate::launcher::types::{request, response};
 use dashmap::DashMap;
 use futures_util::stream::{SplitSink, SplitStream};
-use futures_util::{SinkExt, StreamExt, TryStreamExt};
-use std::collections::HashMap;
+use futures_util::{SinkExt, StreamExt};
+use std::collections::{HashMap, VecDeque};
+use std::future::Future;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::net::TcpStream;
 use tokio::sync::{mpsc, oneshot, Mutex};
 use tokio::task::JoinHandle;
-use tokio::time;
 use tokio_tungstenite::{tungstenite, MaybeTlsStream, WebSocketStream};
 use tracing::{debug, error};
 use uuid::Uuid;
@@ -24,25 +25,40 @@ macro_rules! extract_response {
     };
 }
 
+struct ActorMessage {
+    sender: oneshot::Sender<response::any::Kind>,
+    request: request::any::Any,
+}
+
+type WsRequestsCallbacks = DashMap<Uuid, oneshot::Sender<response::any::Kind>>;
+
+type ActorSender = mpsc::Sender<ActorMessage>;
+type ActorReceiver = mpsc::Receiver<ActorMessage>;
+
+type WebSocketSender = SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, tungstenite::Message>;
+type WebSocketReceiver = SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>>;
+
 pub struct Socket {
-    sender: ActorSender,
+    actor_token: tokio_util::sync::CancellationToken,
+    actor_sender: ActorSender,
     actor_handle: JoinHandle<()>,
 }
 
 impl Socket {
-    pub async fn new(addr: impl Into<String>) -> Result<Socket, tungstenite::Error> {
-        let (ws_stream, _) = tokio_tungstenite::connect_async(addr.into()).await?;
-        let (ws_sender, ws_receiver) = ws_stream.split();
+    pub fn new(addr: impl Into<String>) -> Socket {
+        let actor_token = tokio_util::sync::CancellationToken::new();
+        let (actor_sender, actor_receiver) = mpsc::channel::<ActorMessage>(64);
+        let actor_handle = tokio::spawn(start_handle_loop(
+            addr.into(),
+            actor_receiver,
+            actor_token.clone(),
+        ));
 
-        let (sender, receiver) = mpsc::channel::<ActorMessage>(64);
-        let actor = Arc::new(SocketActor::new(ws_sender, ws_receiver));
-
-        let actor_handle = tokio::spawn(start_actor_handle(actor, receiver));
-
-        Ok(Socket {
-            sender,
+        Socket {
+            actor_token,
+            actor_sender,
             actor_handle,
-        })
+        }
     }
 
     pub async fn restore_token(
@@ -161,7 +177,7 @@ impl Socket {
     ) -> Result<response::any::Kind, error::Error> {
         let (tx, rx) = oneshot::channel();
 
-        self.sender
+        self.actor_sender
             .send(ActorMessage {
                 sender: tx,
                 request,
@@ -173,106 +189,257 @@ impl Socket {
             .map_err(error::ActorError::from)
             .map_err(|err| err.into())
     }
-}
 
-async fn start_actor_handle(actor: Arc<SocketActor>, mut receiver: ActorReceiver) {
-    while let Some(msg) = receiver.recv().await {
-        let actor = actor.clone();
-
-        tokio::spawn(async move {
-            let (tx, rx) = oneshot::channel();
-            let request_id = msg.request.id;
-
-            actor.callbacks.insert(request_id, tx);
-
-            if let Err(err) = actor.handle_message(msg, rx).await {
-                error!("Error with handle actor message: {:?}", err);
-            };
-
-            actor.callbacks.remove(&request_id);
-        });
+    pub fn shutdown(&self) {
+        self.actor_token.cancel();
     }
 }
 
-struct ActorMessage {
-    sender: oneshot::Sender<response::any::Kind>,
-    request: request::any::Any,
+pub async fn execute_with_token_restore<T, F, Fut>(
+    socket: Arc<Socket>,
+    server: &config::Server,
+    action: F,
+) -> Result<T, error::Error>
+where
+    F: Fn() -> Fut,
+    Fut: Future<Output = Result<T, error::Error>>,
+{
+    match action().await {
+        Ok(result) => Ok(result),
+        Err(err) => match err {
+            error::Error::UnexpectedResponse(response::any::Kind::Error(
+                response::error::Error {
+                    kind: response::error::Kind::PermissionsDenied,
+                },
+            )) => {
+                let res = socket
+                    .restore_token(
+                        request::restore_token::Pair {
+                            name: "checkServer".to_string(),
+                            value: server.token.clone(),
+                        },
+                        false,
+                    )
+                    .await;
+
+                if res.map(|v| v.invalid_tokens.is_empty()).unwrap_or(false) {
+                    action().await
+                } else {
+                    Err(err)
+                }
+            }
+            _ => Err(err),
+        },
+    }
 }
 
-type WsRequestsCallbacks = DashMap<Uuid, oneshot::Sender<response::any::Kind>>;
+async fn start_handle_loop(
+    addr: impl Into<String>,
+    mut receiver: ActorReceiver,
+    token: tokio_util::sync::CancellationToken,
+) {
+    let addr = addr.into();
 
-type ActorSender = mpsc::Sender<ActorMessage>;
-type ActorReceiver = mpsc::Receiver<ActorMessage>;
+    let notify = Arc::new(tokio::sync::Notify::new());
+    let mut join_set = tokio::task::JoinSet::<()>::new();
+    let callbacks = Arc::new(DashMap::new() as WsRequestsCallbacks);
 
-type WebSocketSender = SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, tungstenite::Message>;
-type WebSocketReceiver = SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>>;
+    let mut ws_sender: Option<Arc<Mutex<WebSocketSender>>> = None;
+    let mut ws_rx: Option<mpsc::Receiver<String>> = None;
+    let mut ws_token: Option<tokio_util::sync::CancellationToken> = None;
 
-struct SocketActor {
-    callbacks: Arc<WsRequestsCallbacks>,
-    ws_sender: Mutex<WebSocketSender>,
-    receiver_handle: JoinHandle<()>,
-}
+    let (pending_tx, mut pending_rx) = mpsc::channel::<ActorMessage>(64);
+    let pending_tx = Arc::new(pending_tx);
+    let mut pending_messages = VecDeque::<ActorMessage>::new();
 
-impl SocketActor {
-    pub fn new(ws_sender: WebSocketSender, ws_receiver: WebSocketReceiver) -> SocketActor {
-        let callbacks = Arc::new(DashMap::new());
-        let receiver_handle = tokio::spawn(start_receiver_handle(ws_receiver, callbacks.clone()));
-
-        SocketActor {
-            callbacks,
-            ws_sender: Mutex::new(ws_sender),
-            receiver_handle,
+    async fn recv_next_actor_msg(
+        pending_messages: &mut VecDeque<ActorMessage>,
+        receiver: &mut ActorReceiver,
+    ) -> Option<ActorMessage> {
+        if !pending_messages.is_empty() {
+            pending_messages.pop_back()
+        } else {
+            receiver.recv().await
         }
     }
 
-    pub async fn handle_message(
-        &self,
-        message: ActorMessage,
-        receiver: oneshot::Receiver<response::any::Kind>,
-    ) -> Result<(), error::ActorError> {
-        let json_request = serde_json::to_string(&message.request)?;
-        debug!("Request: {}", json_request);
+    async fn recv_next_ws_msg(rx: Option<&mut mpsc::Receiver<String>>) -> Option<String> {
+        if let Some(rx) = rx {
+            rx.recv().await
+        } else {
+            None
+        }
+    }
 
-        let _ = {
-            let mut sender = self.ws_sender.lock().await;
+    loop {
+        if ws_sender.is_none() {
+            match tokio_tungstenite::connect_async(addr.clone()).await {
+                Ok((ws_stream, _)) => {
+                    let (sender, receiver) = ws_stream.split();
+                    let sender = Arc::new(Mutex::new(sender));
+                    let (tx, rx) = mpsc::channel::<String>(64);
 
-            sender.send(tungstenite::Message::Text(json_request)).await
-        };
-        let response = time::timeout(Duration::from_secs(10), receiver).await??;
+                    ws_sender = Some(sender);
+                    ws_rx = Some(rx);
 
-        message
-            .sender
-            .send(response)
-            .map_err(|_| error::ActorError::Send)
+                    let token = token.child_token();
+                    ws_token = Some(token.clone());
+
+                    tokio::spawn(start_handle_websocket_messages(receiver, tx, token));
+                }
+                Err(err) => {
+                    error!("Failed to connect: {}. Retrying in 1 second...", err);
+                    tokio::time::sleep(Duration::from_secs(1)).await;
+
+                    continue;
+                }
+            }
+        }
+
+        tokio::select! {
+            Some(actor_msg) = recv_next_actor_msg(&mut pending_messages, &mut receiver) => {
+                debug!("{:?}", actor_msg.request);
+
+                if let Some(ws_sender) = ws_sender.as_ref() {
+                    join_set.spawn({
+                        let pending_tx = pending_tx.clone();
+
+                        let ws_sender = ws_sender.clone();
+                        let callbacks = callbacks.clone();
+                        let notify = notify.clone();
+
+                        async move {
+                            match handle_actor_request(ws_sender, callbacks, &actor_msg.request).await {
+                                Ok(response) => {
+                                    if actor_msg.sender.send(response).is_err() {
+                                        debug!("failed to send response from actor")
+                                    }
+                                },
+                                Err(err) => {
+                                    match err {
+                                        error::ActorError::Socket(tungstenite::Error::ConnectionClosed)
+                                        | error::ActorError::Socket(tungstenite::Error::AlreadyClosed)
+                                        | error::ActorError::Socket(tungstenite::Error::Io(_))
+                                        | error::ActorError::Socket(tungstenite::Error::Tls(_))
+                                        | error::ActorError::Socket(tungstenite::Error::Protocol(_)) => {
+                                            let _ = pending_tx.send(actor_msg).await;
+
+                                            notify.notify_waiters();
+                                        }
+                                        _ => {}
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
+            }
+            Some(msg) = recv_next_ws_msg(ws_rx.as_mut()) => {
+                join_set.spawn({
+                    let callbacks = callbacks.clone();
+
+                    async move {
+                        let Ok(deserialzied) = serde_json::from_str::<response::any::Any>(&msg) else {
+                            return;
+                        };
+                        debug!("Response: {:?}", deserialzied);
+
+                        let _ = callbacks
+                            .remove(&deserialzied.id)
+                            .map(|(_, sender)| sender.send(deserialzied.body));
+                    }
+                });
+            }
+            Some(pending_msg) = pending_rx.recv() => {
+                pending_messages.push_back(pending_msg);
+            }
+            _ = notify.notified() => {
+                debug!("socket disconnect notify received");
+
+                ws_sender = None;
+                ws_rx = None;
+                if let Some(token) = ws_token.as_ref() {
+                    token.cancel()
+                }
+            }
+            _ = token.cancelled() => {
+                debug!("start_handle_loop cancelled");
+
+                join_set.join_all().await;
+
+                break;
+            }
+        }
     }
 }
 
-async fn start_receiver_handle(receiver: WebSocketReceiver, callbacks: Arc<WsRequestsCallbacks>) {
-    let _ = receiver
-        .try_for_each_concurrent(64, |message| {
-            let callbacks = callbacks.clone();
+async fn handle_actor_request(
+    ws_sender: Arc<Mutex<WebSocketSender>>,
+    callbacks: Arc<WsRequestsCallbacks>,
+    request: &request::any::Any,
+) -> Result<response::any::Kind, error::ActorError> {
+    let (tx, rx) = oneshot::channel();
+    let request_id = request.id;
 
-            async move {
-                let tungstenite::Message::Text(body) = message else {
-                    return Ok(());
-                };
+    callbacks.insert(request_id, tx);
 
-                debug!("Response: {}", body);
-                let response = match serde_json::from_str::<response::any::Any>(&body) {
-                    Ok(v) => v,
+    let clos = || async {
+        let json_request = serde_json::to_string(&request)?;
+        debug!("Raw request: {}", json_request);
+
+        ws_sender
+            .lock()
+            .await
+            .send(tungstenite::Message::Text(json_request))
+            .await?;
+
+        let response = rx.await?;
+
+        Result::<response::any::Kind, error::ActorError>::Ok(response)
+    };
+
+    let res = clos().await;
+
+    callbacks.remove(&request_id);
+
+    res
+}
+
+async fn start_handle_websocket_messages(
+    mut ws_receiver: WebSocketReceiver,
+    sender: mpsc::Sender<String>,
+    token: tokio_util::sync::CancellationToken,
+) {
+    const CONCURRENCY: usize = 64;
+    let mut join_set = tokio::task::JoinSet::<()>::new();
+
+    loop {
+        tokio::select! {
+            Some(msg) = ws_receiver.next() => {
+                match msg {
+                    Ok(tungstenite::Message::Text(raw_response)) => {
+                        while join_set.len() >= CONCURRENCY {
+                            join_set.join_next().await;
+                        }
+
+                        debug!("Raw response: {}", raw_response);
+                        let _ = sender.send(raw_response).await;
+                    },
                     Err(err) => {
-                        debug!("Error with deserialize message from socket: {}", err);
-
-                        return Ok(());
+                        debug!("socket receiver error: {}", err);
+                    },
+                    v => {
+                        debug!("unknown msg received: {:?}", v);
                     }
-                };
+                }
+            },
+            _ = token.cancelled() => {
+                debug!("start_ws_receiver_handle cancelled");
 
-                let _ = callbacks
-                    .remove(&response.id)
-                    .map(|(_, sender)| sender.send(response.body));
+                join_set.join_all().await;
 
-                Ok(())
+                break;
             }
-        })
-        .await;
+        }
+    }
 }

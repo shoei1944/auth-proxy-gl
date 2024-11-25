@@ -46,7 +46,7 @@ async fn _main(config: AppConfig) -> Result<(), Box<dyn Error>> {
     let listener = net::TcpListener::bind(addr).await?;
     info!("Proxy listening on address {}", addr);
 
-    let sockets = Sockets::from_servers(&config.servers).await;
+    let sockets = Arc::new(Sockets::from_servers(&config.servers).await);
 
     let router = axum::Router::new()
         .nest(
@@ -58,12 +58,14 @@ async fn _main(config: AppConfig) -> Result<(), Box<dyn Error>> {
         )
         .with_state(state::State {
             config: Arc::new(config),
-            sockets: Arc::new(sockets),
+            sockets: sockets.clone(),
         });
 
     axum::serve(listener, router)
         .with_graceful_shutdown(async move {
             signal::ctrl_c().await.unwrap();
+
+            sockets.inner().for_each(|socket| socket.shutdown());
 
             debug!("Ctrl^C signal received. Quitting.");
         })
