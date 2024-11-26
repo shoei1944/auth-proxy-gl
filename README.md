@@ -88,7 +88,7 @@ token server SERVER-NAME std false
 "servers": {
   "1.20.1-Vanilla": {
     "api": "wss://launcher.example.com/api",
-    "token": "abcd1234efgh5678"
+    "token": "eyJhbGciOiJFUzI1NiJ9.eyJpc3MiOiJMYXVuY2hTZXJ2ZXIiLCJzZXJ2ZXJOYW1lIjoiZjIzNmU4MGYtZGE2MC00ZjZjLTlkYTgtMWVmNmZjYzU0Zjk2IiwiYXV0aElkIjoic3RkIiwidG9rZW5UeXBlIjoiY2hlY2tTZXJ2ZXIiLCJpc1B1YmxpYyI6ZmFsc2V9.sLnTi6LcLKtjB8eg7Zqa-M84zyEXowVOYvt7zThVtG-tqA3_8vpjqzYqqDV35w4mbqBhroQ7asl0ef9Z1GBilw"
   }
 }
 ```
