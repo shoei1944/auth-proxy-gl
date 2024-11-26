@@ -1,12 +1,17 @@
-use crate::config::Config;
 use crate::{config, launcher};
 use std::collections::HashMap;
 use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct State {
-    pub config: Arc<Config>,
+    pub key_pair: Arc<KeyPair>,
+    pub servers: Arc<HashMap<String, config::Server>>,
     pub sockets: Arc<Sockets>,
+}
+
+pub struct KeyPair {
+    pub public: String,
+    pub private: String,
 }
 
 #[derive(Default)]

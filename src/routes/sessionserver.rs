@@ -28,7 +28,7 @@ async fn has_joined(
     Path(server_id): Path<String>,
     Query(query): Query<request::has_joined::Query>,
 ) -> impl IntoResponse {
-    let Some(current_server) = state.config.servers.get(&server_id) else {
+    let Some(current_server) = state.servers.get(&server_id) else {
         return StatusCode::NO_CONTENT.into_response();
     };
     let Some(socket) = state.sockets.socket(server_id) else {
@@ -63,7 +63,7 @@ async fn profile_by_uuid(
     Path((server_id, uuid)): Path<(String, Uuid)>,
     Query(query): Query<request::profile_by_uuid::Query>,
 ) -> impl IntoResponse {
-    let Some(current_server) = state.config.servers.get(&server_id) else {
+    let Some(current_server) = state.servers.get(&server_id) else {
         return StatusCode::NO_CONTENT.into_response();
     };
     let Some(socket) = state.sockets.socket(server_id) else {

@@ -19,7 +19,7 @@ async fn profiles_by_usernames(
     Path(server_id): Path<String>,
     Json(profiles_by_usernames::Body(usernames)): Json<profiles_by_usernames::Body>,
 ) -> impl IntoResponse {
-    let Some(current_server) = state.config.servers.get(&server_id) else {
+    let Some(current_server) = state.servers.get(&server_id) else {
         return StatusCode::NO_CONTENT.into_response();
     };
     let Some(socket) = state.sockets.socket(server_id) else {

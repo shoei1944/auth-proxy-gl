@@ -1,3 +1,4 @@
+use anyhow::Context;
 use auth_proxy_gl::config::Config as AppConfig;
 use auth_proxy_gl::state::Sockets;
 use auth_proxy_gl::{routes, state};
@@ -44,10 +45,6 @@ fn main() -> Result<(), Box<dyn Error>> {
 }
 
 async fn _main(config: AppConfig) -> Result<(), Box<dyn Error>> {
-    let addr = format!("{}:{}", config.api.host, config.api.port).parse::<SocketAddr>()?;
-    let listener = net::TcpListener::bind(addr).await?;
-    info!("Proxy listening on address {}", addr);
-
     let sockets = Arc::new(Sockets::from_servers(&config.servers).await);
 
     let router = axum::Router::new()
@@ -59,9 +56,25 @@ async fn _main(config: AppConfig) -> Result<(), Box<dyn Error>> {
                 .nest("/sessionserver", routes::sessionserver::router()),
         )
         .with_state(state::State {
-            config: Arc::new(config),
+            servers: Arc::new(config.servers),
+            key_pair: Arc::new(state::KeyPair {
+                public: tokio::fs::read_to_string(&config.keys.public)
+                    .await
+                    .with_context(|| {
+                        format!("failed to read public key from {:?}", config.keys.public)
+                    })?,
+                private: tokio::fs::read_to_string(&config.keys.private)
+                    .await
+                    .with_context(|| {
+                        format!("failed to read private key from {:?}", config.keys.private)
+                    })?,
+            }),
             sockets: sockets.clone(),
         });
+
+    let addr = format!("{}:{}", config.api.host, config.api.port).parse::<SocketAddr>()?;
+    let listener = net::TcpListener::bind(addr).await?;
+    info!("Proxy listening on address {}", addr);
 
     axum::serve(listener, router)
         .with_graceful_shutdown(async move {

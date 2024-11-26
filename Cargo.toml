@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+anyhow = "1.0.93"
 axum = "0.7.9"
 base64 = "0.22.1"
 dashmap = "6.1.0"

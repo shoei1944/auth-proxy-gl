@@ -1,10 +1,11 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::path::PathBuf;
 
 #[derive(Serialize, Deserialize, Debug, Default)]
 pub struct Config {
     pub api: Api,
-    pub keys: KeyPair,
+    pub keys: KeyPairPaths,
     pub servers: HashMap<String, Server>,
 }
 
@@ -15,9 +16,9 @@ pub struct Api {
 }
 
 #[derive(Serialize, Deserialize, Debug, Default)]
-pub struct KeyPair {
-    pub private: String,
-    pub public: String,
+pub struct KeyPairPaths {
+    pub private: PathBuf,
+    pub public: PathBuf,
 }
 
 #[derive(Serialize, Deserialize, Debug, Default)]

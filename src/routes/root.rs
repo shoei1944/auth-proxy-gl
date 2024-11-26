@@ -16,7 +16,7 @@ async fn root(State(state): State<state::State>) -> Json<response::root::Root> {
             implementation_version: None,
         },
         skin_domains: Vec::new(),
-        signature_public_key: state.config.keys.public.to_string(),
+        signature_public_key: state.key_pair.public.to_string(),
     };
 
     Json(response)

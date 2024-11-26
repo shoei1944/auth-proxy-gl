@@ -59,13 +59,13 @@
    ```bash
    openssl genrsa -out private.pem 4096
    ```
-   Содержимое файла `private.pem` скопируйте в поле `private`.
+   Укажите путь до файла `private.pem` в поле `private`.
 
 2. Создайте публичный ключ:
    ```bash
    openssl rsa -in private.pem -pubout -out public.pem
    ```
-   Содержимое файла `public.pem` скопируйте в поле `public`.
+   Укажите путь до файла `public.pem` в поле `public`.
 
 ---
 
