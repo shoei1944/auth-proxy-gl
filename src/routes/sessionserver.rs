@@ -11,7 +11,7 @@ use axum::routing::{on, MethodFilter};
 use axum::{Json, Router};
 use base64::prelude::BASE64_STANDARD;
 use base64::Engine;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{self, SystemTime, UNIX_EPOCH};
 use uuid::Uuid;
 
 pub fn router() -> Router<state::State> {
@@ -49,11 +49,18 @@ async fn has_joined(
         return StatusCode::NO_CONTENT.into_response();
     };
 
-    let response = profile::Profile {
-        id: check_server.uuid.simple().to_string(),
-        name: check_server.profile.username,
-        properties: Vec::new(),
+    let Ok(profile) =
+        launcher::socket::execute_with_token_restore(socket.clone(), current_server, || {
+            socket.get_profile_by_uuid(check_server.uuid)
+        })
+        .await
+    else {
+        return StatusCode::NO_CONTENT.into_response();
     };
+
+    let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+
+    let response = transform_profile(now, profile.player_profile);
 
     (StatusCode::OK, Json(response)).into_response()
 }
@@ -61,7 +68,7 @@ async fn has_joined(
 async fn profile_by_uuid(
     State(state): State<state::State>,
     Path((server_id, uuid)): Path<(String, Uuid)>,
-    Query(query): Query<request::profile_by_uuid::Query>,
+    Query(_): Query<request::profile_by_uuid::Query>,
 ) -> impl IntoResponse {
     let Some(current_server) = state.servers.get(&server_id) else {
         return StatusCode::NO_CONTENT.into_response();
@@ -81,37 +88,40 @@ async fn profile_by_uuid(
 
     let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
 
-    let skin = profile.player_profile.assets.skin.map(|skin| skin::Skin {
+    let response = transform_profile(now, profile.player_profile);
+
+    (StatusCode::OK, Json(response)).into_response()
+}
+
+fn transform_profile(
+    now: time::Duration,
+    profile: launcher::types::response::base::profile::Profile,
+) -> profile::Profile {
+    let skin = profile.assets.skin.map(|skin| skin::Skin {
         url: skin.url,
         metadata: skin.metadata.map(|_| metadata::Metadata {
             model: metadata::Model::Slim,
         }),
     });
-    let cape = profile
-        .player_profile
-        .assets
-        .cape
-        .map(|cape| cape::Cape { url: cape.url });
+    let cape = profile.assets.cape.map(|cape| cape::Cape { url: cape.url });
 
     let textures = textures::Textures {
         timestamp: now.as_millis(),
-        profile_id: profile.player_profile.uuid.simple().to_string(),
-        profile_name: profile.player_profile.username.clone(),
-        signature_required: !query.unsigned,
+        profile_id: profile.uuid.simple().to_string(),
+        profile_name: profile.username.clone(),
+        signature_required: false,
         textures: textures::kind::Kind { skin, cape },
     };
 
     let encoded = BASE64_STANDARD.encode(serde_json::to_string(&textures).unwrap());
 
-    let response = profile::Profile {
-        id: profile.player_profile.uuid.simple().to_string(),
-        name: profile.player_profile.username,
+    profile::Profile {
+        id: profile.uuid.simple().to_string(),
+        name: profile.username,
         properties: vec![profile::property::Property {
             name: "textures".to_string(),
             value: encoded,
             signature: None,
         }],
-    };
-
-    (StatusCode::OK, Json(response)).into_response()
+    }
 }
