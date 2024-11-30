@@ -3,7 +3,7 @@ use crate::launcher::error;
 use crate::launcher::types::{request, response};
 use dashmap::DashMap;
 use futures_util::stream::{SplitSink, SplitStream};
-use futures_util::{SinkExt, StreamExt};
+use futures_util::{future, SinkExt, StreamExt};
 use std::collections::{HashMap, VecDeque};
 use std::future::Future;
 use std::sync::Arc;
@@ -24,6 +24,8 @@ macro_rules! extract_response {
         }
     };
 }
+
+const CONCURRENCY: usize = 128;
 
 struct ActorMessage {
     sender: oneshot::Sender<response::any::Kind>,
@@ -47,7 +49,7 @@ pub struct Socket {
 impl Socket {
     pub fn new(addr: impl Into<String>) -> Socket {
         let actor_token = tokio_util::sync::CancellationToken::new();
-        let (actor_sender, actor_receiver) = mpsc::channel::<ActorMessage>(64);
+        let (actor_sender, actor_receiver) = mpsc::channel::<ActorMessage>(CONCURRENCY);
         let actor_handle = tokio::spawn(start_handle_loop(
             addr.into(),
             actor_receiver,
@@ -248,7 +250,7 @@ async fn start_handle_loop(
     let mut ws_rx: Option<mpsc::Receiver<String>> = None;
     let mut ws_token: Option<tokio_util::sync::CancellationToken> = None;
 
-    let (pending_tx, mut pending_rx) = mpsc::channel::<ActorMessage>(64);
+    let (pending_tx, mut pending_rx) = mpsc::channel::<ActorMessage>(CONCURRENCY);
     let pending_tx = Arc::new(pending_tx);
     let mut pending_messages = VecDeque::<ActorMessage>::new();
 
@@ -256,8 +258,8 @@ async fn start_handle_loop(
         pending_messages: &mut VecDeque<ActorMessage>,
         receiver: &mut ActorReceiver,
     ) -> Option<ActorMessage> {
-        if !pending_messages.is_empty() {
-            pending_messages.pop_back()
+        if let Some(message) = pending_messages.pop_back() {
+            Some(message)
         } else {
             receiver.recv().await
         }
@@ -410,7 +412,6 @@ async fn start_handle_websocket_messages(
     sender: mpsc::Sender<String>,
     token: tokio_util::sync::CancellationToken,
 ) {
-    const CONCURRENCY: usize = 64;
     let mut join_set = tokio::task::JoinSet::<()>::new();
 
     loop {
@@ -425,12 +426,12 @@ async fn start_handle_websocket_messages(
                         debug!("Raw response: {}", raw_response);
                         let _ = sender.send(raw_response).await;
                     },
+                    Ok(v) => {
+                        debug!("unknown msg received: {:?}", v);
+                    },
                     Err(err) => {
                         debug!("socket receiver error: {}", err);
                     },
-                    v => {
-                        debug!("unknown msg received: {:?}", v);
-                    }
                 }
             },
             _ = token.cancelled() => {
