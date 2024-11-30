@@ -81,19 +81,6 @@ impl Socket {
         extract_response!(response, response::any::Kind::RestoreToken)
     }
 
-    pub async fn get_public_key(
-        &self,
-    ) -> Result<response::get_public_key::GetPublicKey, error::Error> {
-        let response = self
-            .send_to_actor(request::Request {
-                id: Uuid::new_v4(),
-                body: request::any::Kind::GetPublicKey(request::get_public_key::GetPublicKey {}),
-            })
-            .await?;
-
-        extract_response!(response, response::any::Kind::GetPublicKey)
-    }
-
     pub async fn check_server(
         &self,
         username: impl Into<String>,

@@ -15,7 +15,7 @@ pub struct Request<T: Serialize + DeserializeOwned> {
 pub mod any {
     use crate::launcher::types::request::{
         batch_profiles_by_usernames, check_server, get_profile_by_username, get_profile_by_uuid,
-        get_public_key, restore_token, Request,
+        restore_token, Request,
     };
     use serde::{Deserialize, Serialize};
 
@@ -26,9 +26,6 @@ pub mod any {
     pub enum Kind {
         #[serde(rename = "restore")]
         RestoreToken(restore_token::RestoreToken),
-
-        #[serde(rename = "getPublicKey")]
-        GetPublicKey(get_public_key::GetPublicKey),
 
         #[serde(rename = "checkServer")]
         CheckServer(check_server::CheckServer),
@@ -60,13 +57,6 @@ pub mod restore_token {
         pub name: String,
         pub value: String,
     }
-}
-
-pub mod get_public_key {
-    use serde::{Deserialize, Serialize};
-
-    #[derive(Serialize, Deserialize, Debug)]
-    pub struct GetPublicKey {}
 }
 
 pub mod check_server {
