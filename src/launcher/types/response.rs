@@ -61,11 +61,14 @@ pub mod error {
         #[serde(rename = "User not found")]
         UserNotFound,
 
+        #[serde(rename = "User not verified")]
+        UserNotVerified,
+
         #[serde(rename = "Permissions denied")]
         PermissionsDenied,
-        
+
         #[serde(untagged)]
-        Other(String)
+        Other(String),
     }
 }
 
