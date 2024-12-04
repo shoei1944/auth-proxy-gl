@@ -1,7 +1,7 @@
 use anyhow::Context;
 use auth_proxy_gl::config::Config as AppConfig;
 use auth_proxy_gl::state::Sockets;
-use auth_proxy_gl::{routes, state};
+use auth_proxy_gl::{config, routes, state};
 use figment::providers;
 use figment::providers::Format;
 use std::error::Error;
@@ -28,7 +28,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         .init();
 
     if !fs::exists(CONFIG_FILE)? {
-        let default_config = serde_json::to_string_pretty(&AppConfig::default())?;
+        info!("Config file not found. Saving default.");
+
+        let default_config = serde_json::to_string_pretty(&config::default())?;
 
         fs::write(CONFIG_FILE, default_config)?;
 
