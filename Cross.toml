@@ -1,2 +1,7 @@
-[build.zig]
+[target.x86_64-unknown-linux-gnu.zig]
 enable = true
+version = "2.16"
+
+[target.aarch64-unknown-linux-gnu.zig]
+enable = true
+version = "2.17"
