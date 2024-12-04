@@ -47,7 +47,7 @@ pub struct Socket {
 }
 
 impl Socket {
-    pub fn new(addr: impl Into<String>) -> Socket {
+    pub fn new(addr: impl Into<url::Url>) -> Socket {
         let actor_token = tokio_util::sync::CancellationToken::new();
         let (actor_sender, actor_receiver) = mpsc::channel::<ActorMessage>(CONCURRENCY);
         let actor_handle = tokio::spawn(start_handle_loop(
@@ -223,7 +223,7 @@ where
 }
 
 async fn start_handle_loop(
-    addr: impl Into<String>,
+    addr: impl Into<url::Url>,
     mut receiver: ActorReceiver,
     token: tokio_util::sync::CancellationToken,
 ) {

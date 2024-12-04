@@ -26,7 +26,7 @@ impl Sockets {
         };
 
         for (id, server) in servers {
-            sockets.insert(id, launcher::Socket::new(&server.api))
+            sockets.insert(id, launcher::Socket::new(server.api.clone()))
         }
 
         sockets
