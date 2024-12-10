@@ -1,7 +1,8 @@
 use anyhow::Context;
 use auth_proxy_gl::config::Config as AppConfig;
 use auth_proxy_gl::state::Sockets;
-use auth_proxy_gl::{config, routes, state};
+use auth_proxy_gl::{args, config, routes, state};
+use clap::Parser;
 use figment::providers;
 use figment::providers::Format;
 use std::error::Error;
@@ -15,8 +16,6 @@ use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{fmt, EnvFilter};
 
-const CONFIG_FILE: &str = "config.json";
-
 fn main() -> Result<(), Box<dyn Error>> {
     let env_filter = EnvFilter::builder()
         .with_default_directive(LevelFilter::INFO.into())
@@ -27,18 +26,20 @@ fn main() -> Result<(), Box<dyn Error>> {
         .with(env_filter)
         .init();
 
-    if !fs::exists(CONFIG_FILE)? {
+    let args = args::Args::parse();
+
+    if !fs::exists(&args.config_path)? {
         info!("Config file not found. Saving default.");
 
         let default_config = serde_json::to_string_pretty(&config::default())?;
 
-        fs::write(CONFIG_FILE, default_config)?;
+        fs::write(&args.config_path, default_config)?;
 
         return Ok(());
     }
 
     let config = figment::Figment::new()
-        .join(providers::Json::file(CONFIG_FILE))
+        .join(providers::Json::file(&args.config_path))
         .extract::<AppConfig>()?;
 
     let rt = runtime::Builder::new_multi_thread().enable_all().build()?;
