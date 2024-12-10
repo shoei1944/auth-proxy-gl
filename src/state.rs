@@ -1,6 +1,5 @@
 use crate::{config, launcher};
-use std::collections::HashMap;
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 #[derive(Clone)]
 pub struct State {

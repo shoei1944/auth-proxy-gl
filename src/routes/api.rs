@@ -1,11 +1,16 @@
-use crate::injector::types::request::profiles_by_usernames;
-use crate::injector::types::response::profile;
-use crate::{launcher, state};
-use axum::extract::{Path, State};
-use axum::http::StatusCode;
-use axum::response::IntoResponse;
-use axum::routing::{on, MethodFilter};
-use axum::{Json, Router};
+use crate::{
+    injector::types::{request::profiles_by_usernames, response::profile},
+    launcher,
+    state,
+};
+use axum::{
+    extract::{Path, State},
+    http::StatusCode,
+    response::IntoResponse,
+    routing::{on, MethodFilter},
+    Json,
+    Router,
+};
 
 pub fn router() -> Router<state::State> {
     Router::new().route(

@@ -1,10 +1,12 @@
-use crate::injector::types::response;
-use crate::state;
-use axum::extract::{Path, State};
-use axum::http::StatusCode;
-use axum::response::IntoResponse;
-use axum::routing::{on, MethodFilter};
-use axum::{Json, Router};
+use crate::{injector::types::response, state};
+use axum::{
+    extract::{Path, State},
+    http::StatusCode,
+    response::IntoResponse,
+    routing::{on, MethodFilter},
+    Json,
+    Router,
+};
 
 pub fn router() -> Router<state::State> {
     Router::new().route("/", on(MethodFilter::GET, root))

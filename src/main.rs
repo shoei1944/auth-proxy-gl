@@ -1,20 +1,17 @@
 use anyhow::Context;
-use auth_proxy_gl::config::Config as AppConfig;
-use auth_proxy_gl::state::Sockets;
-use auth_proxy_gl::{args, config, routes, state};
+use auth_proxy_gl::{args, config, config::Config as AppConfig, routes, state, state::Sockets};
 use clap::Parser;
-use figment::providers;
-use figment::providers::Format;
-use std::error::Error;
-use std::fs;
-use std::net::SocketAddr;
-use std::sync::Arc;
+use figment::{providers, providers::Format};
+use std::{error::Error, fs, net::SocketAddr, sync::Arc};
 use tokio::{net, runtime, signal};
 use tracing::{debug, info};
-use tracing_subscriber::filter::LevelFilter;
-use tracing_subscriber::layer::SubscriberExt;
-use tracing_subscriber::util::SubscriberInitExt;
-use tracing_subscriber::{fmt, EnvFilter};
+use tracing_subscriber::{
+    filter::LevelFilter,
+    fmt,
+    layer::SubscriberExt,
+    util::SubscriberInitExt,
+    EnvFilter,
+};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let env_filter = EnvFilter::builder()

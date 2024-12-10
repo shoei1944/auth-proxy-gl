@@ -1,7 +1,9 @@
 use crate::launcher::types::response;
 use std::fmt::{Display, Formatter};
-use tokio::sync::{mpsc, oneshot};
-use tokio::time;
+use tokio::{
+    sync::{mpsc, oneshot},
+    time,
+};
 use tokio_tungstenite::tungstenite;
 
 #[derive(Debug)]

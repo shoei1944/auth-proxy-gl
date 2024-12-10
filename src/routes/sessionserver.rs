@@ -1,16 +1,26 @@
-use crate::injector::types::request;
-use crate::injector::types::response::profile;
-use crate::injector::types::response::profile::property::textures;
-use crate::injector::types::response::profile::property::textures::kind::skin::metadata;
-use crate::injector::types::response::profile::property::textures::kind::{cape, skin};
-use crate::{launcher, state};
-use axum::extract::{Path, Query, State};
-use axum::http::StatusCode;
-use axum::response::IntoResponse;
-use axum::routing::{on, MethodFilter};
-use axum::{Json, Router};
-use base64::prelude::BASE64_STANDARD;
-use base64::Engine;
+use crate::{
+    injector::types::{
+        request,
+        response::{
+            profile,
+            profile::property::{
+                textures,
+                textures::kind::{cape, skin, skin::metadata},
+            },
+        },
+    },
+    launcher,
+    state,
+};
+use axum::{
+    extract::{Path, Query, State},
+    http::StatusCode,
+    response::IntoResponse,
+    routing::{on, MethodFilter},
+    Json,
+    Router,
+};
+use base64::{prelude::BASE64_STANDARD, Engine};
 use std::time::{self, SystemTime, UNIX_EPOCH};
 use uuid::Uuid;
 
