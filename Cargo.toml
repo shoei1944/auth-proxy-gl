@@ -1,6 +1,7 @@
 [package]
 name = "auth-proxy-gl"
 version = "0.1.2"
+authors = ["IXLShizua"]
 edition = "2021"
 
 [dependencies]
