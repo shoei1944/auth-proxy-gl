@@ -1,6 +1,5 @@
 use crate::{
     injector::types::{request::profiles_by_usernames, response::profile},
-    launcher,
     state,
 };
 use axum::{
@@ -31,8 +30,8 @@ async fn profiles_by_usernames(
         return StatusCode::NO_CONTENT.into_response();
     };
 
-    let Ok(profiles) =
-        launcher::socket::execute_with_token_restore(socket.clone(), current_server, || {
+    let Ok(profiles) = socket
+        .with_token_restore(current_server, || {
             socket.batch_profiles_by_usernames(usernames.clone())
         })
         .await

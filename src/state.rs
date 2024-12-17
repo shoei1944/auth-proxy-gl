@@ -15,7 +15,7 @@ pub struct KeyPair {
 
 #[derive(Default)]
 pub struct Sockets {
-    inner: HashMap<String, Arc<launcher::Socket>>,
+    inner: HashMap<String, Arc<launcher::Api>>,
 }
 
 impl Sockets {
@@ -25,21 +25,21 @@ impl Sockets {
         };
 
         for (id, server) in servers {
-            sockets.insert(id, launcher::Socket::new(server.api.clone()))
+            sockets.insert(id, launcher::Api::new(server.api.clone()))
         }
 
         sockets
     }
 
-    pub fn insert(&mut self, id: impl Into<String>, socket: launcher::Socket) {
+    pub fn insert(&mut self, id: impl Into<String>, socket: launcher::Api) {
         self.inner.insert(id.into(), Arc::new(socket));
     }
 
-    pub fn socket(&self, id: impl Into<String>) -> Option<Arc<launcher::Socket>> {
+    pub fn socket(&self, id: impl Into<String>) -> Option<Arc<launcher::Api>> {
         self.inner.get(&id.into()).cloned()
     }
 
-    pub fn inner(&self) -> impl Iterator<Item = &Arc<launcher::Socket>> {
+    pub fn inner(&self) -> impl Iterator<Item = &Arc<launcher::Api>> {
         self.inner.values()
     }
 }

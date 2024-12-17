@@ -2,6 +2,7 @@ use anyhow::Context;
 use auth_proxy_gl::{args, config, config::Config as AppConfig, routes, state, state::Sockets};
 use clap::Parser;
 use figment::{providers, providers::Format};
+use futures::StreamExt;
 use std::{error::Error, fs, net::SocketAddr, sync::Arc};
 use tokio::{net, runtime, signal};
 use tracing::{debug, info};
@@ -80,7 +81,9 @@ async fn _main(config: AppConfig) -> Result<(), Box<dyn Error>> {
         .with_graceful_shutdown(async move {
             signal::ctrl_c().await.unwrap();
 
-            sockets.inner().for_each(|socket| socket.shutdown());
+            futures::stream::iter(sockets.inner())
+                .for_each(|socket| socket.shutdown())
+                .await;
 
             debug!("Ctrl^C signal received. Quitting.");
         })

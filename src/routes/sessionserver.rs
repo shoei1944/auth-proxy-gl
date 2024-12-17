@@ -45,8 +45,8 @@ async fn has_joined(
         return StatusCode::NO_CONTENT.into_response();
     };
 
-    let Ok(check_server) =
-        launcher::socket::execute_with_token_restore(socket.clone(), current_server, || {
+    let Ok(check_server) = socket
+        .with_token_restore(current_server, || {
             socket.check_server(
                 query.username.clone(),
                 query.server_id.clone(),
@@ -59,8 +59,8 @@ async fn has_joined(
         return StatusCode::NO_CONTENT.into_response();
     };
 
-    let Ok(profile) =
-        launcher::socket::execute_with_token_restore(socket.clone(), current_server, || {
+    let Ok(profile) = socket
+        .with_token_restore(current_server, || {
             socket.get_profile_by_uuid(check_server.uuid)
         })
         .await
@@ -87,10 +87,8 @@ async fn profile_by_uuid(
         return StatusCode::NO_CONTENT.into_response();
     };
 
-    let Ok(profile) =
-        launcher::socket::execute_with_token_restore(socket.clone(), current_server, || {
-            socket.get_profile_by_uuid(uuid)
-        })
+    let Ok(profile) = socket
+        .with_token_restore(current_server, || socket.get_profile_by_uuid(uuid))
         .await
     else {
         return StatusCode::NO_CONTENT.into_response();
