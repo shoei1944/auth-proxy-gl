@@ -166,7 +166,7 @@ async fn start_handle_loop(
     let (loopback_output_ev_sender, mut loopback_output_ev_receiver) =
         mpsc::channel::<output::loopback::Loop<WebSocketReceiver, WebSocketSender>>(1);
 
-    // Flags to track connection and reconnection states.
+    // Flags to track connection state.
     let mut ws_is_connected = false;
 
     // Initiate connection to the WebSocket server.
@@ -186,6 +186,7 @@ async fn start_handle_loop(
     // Main event loop.
     loop {
         tokio::select! {
+            // Handle events from the loopback output (e.g., successful connection)
             Some(event) = loopback_output_ev_receiver.recv() => {
                 match event {
                     output::loopback::Loop::SocketConnected { read, write } => {
@@ -246,6 +247,7 @@ async fn start_handle_loop(
                     }
                 }
             }
+
             // Handle events from the WebSocket output (e.g., incoming messages, errors).
             Some(event) = ws_output_ev_receiver.recv() => {
                 match event {
@@ -329,12 +331,12 @@ async fn start_loopback_handle_loop(
                     match tokio_tungstenite::connect_async(addr.clone()).await {
                         Ok(ws_stream) => {
                             debug!("Successfully connected to socket with addr: {}", addr);
+
                             break ws_stream;
                         }
                         Err(err) => {
                             debug!("Error with connect to socket: {}", err);
 
-                            // Wait for the specified timeout before retrying.
                             if let Some(timeout) = timeout {
                                 tokio::time::sleep(timeout).await;
                             }
@@ -402,6 +404,7 @@ async fn start_ws_handle_loop(
 
     loop {
         tokio::select! {
+            // Handle incoming events from the main loop.
             Some(event) = ev_receiver.recv() => {
                 match event {
                     input::websocket::Loop::Message(msg) => {
@@ -432,6 +435,8 @@ async fn start_ws_handle_loop(
                     }
                 }
             }
+
+            // Handle events from the outgoing message handler.
             Some(ws_sender_output_ev) = ws_sender_output_ev_rx.recv() => {
                 match ws_sender_output_ev {
                     output::websocket::sender::Loop::FailedToSend(msg, err) => {
@@ -450,6 +455,8 @@ async fn start_ws_handle_loop(
                     }
                 }
             }
+
+            // Handle events from the incoming message handler.
             Some(ws_receiver_output_ev) = ws_receiver_output_ev_rx.recv() => {
                 match ws_receiver_output_ev {
                     output::websocket::receiver::Loop::Message(msg) => {
