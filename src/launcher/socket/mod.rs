@@ -220,7 +220,7 @@ async fn start_handle_loop(
                         requests_callbacks.insert(msg.request.id, msg.sender);
 
                         let _ = ws_input_ev_sender
-                            .send(input::websocket::Loop::Message(tungstenite::Message::Text(json_request)))
+                            .send(input::websocket::Loop::Message(tungstenite::Message::text(json_request)))
                             .await;
                     },
                     input::Loop::Shutdown(sender) => {
