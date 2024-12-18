@@ -56,11 +56,11 @@ impl Socket {
     /// # Returns
     ///
     /// A new instance of `Socket`.
-    pub fn new(addr: impl Into<url::Url>) -> Socket {
+    pub fn new(addr: impl Into<url::Url>, timeout: impl Into<Option<Duration>>) -> Socket {
         let (actor_sender, actor_receiver) = mpsc::channel(CAPACITY);
         tokio::spawn(start_handle_loop(
             addr.into(),
-            Duration::from_secs(2),
+            timeout.into(),
             actor_receiver,
         ));
 

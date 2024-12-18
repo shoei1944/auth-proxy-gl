@@ -6,6 +6,7 @@ use crate::{
     config,
     launcher::types::{request, response},
 };
+use std::time::Duration;
 use std::{collections::HashMap, future::Future};
 use uuid::Uuid;
 
@@ -24,9 +25,9 @@ pub struct Api {
 }
 
 impl Api {
-    pub fn new(addr: impl Into<url::Url>) -> Api {
+    pub fn new(addr: impl Into<url::Url>, timeout: impl Into<Option<Duration>>) -> Api {
         Api {
-            socket: socket::Socket::new(addr),
+            socket: socket::Socket::new(addr, timeout),
         }
     }
 

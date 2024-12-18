@@ -1,4 +1,5 @@
 use crate::{config, launcher};
+use std::time::Duration;
 use std::{collections::HashMap, sync::Arc};
 
 #[derive(Clone)]
@@ -25,7 +26,10 @@ impl Sockets {
         };
 
         for (id, server) in servers {
-            sockets.insert(id, launcher::Api::new(server.api.clone()))
+            sockets.insert(
+                id,
+                launcher::Api::new(server.api.clone(), Duration::from_secs(2)),
+            )
         }
 
         sockets
