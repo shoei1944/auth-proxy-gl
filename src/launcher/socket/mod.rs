@@ -185,6 +185,17 @@ async fn start_handle_loop(
 
     // Main event loop.
     loop {
+        // Retry sending any messages that previously failed.
+        if !not_sent_messages.is_empty() && ws_is_connected {
+            let Some(message) = not_sent_messages.pop_front() else {
+                continue
+            };
+
+            let _ = ws_input_ev_sender
+                .send(input::websocket::Loop::Message(message))
+                .await;
+        }
+        
         tokio::select! {
             // Handle events from the loopback output (e.g., successful connection)
             Some(event) = loopback_output_ev_receiver.recv() => {
@@ -302,13 +313,6 @@ async fn start_handle_loop(
                             .await;
                     }
                 }
-            }
-
-            // Retry sending any messages that previously failed.
-            Some(message) = async { not_sent_messages.pop_front() }, if !not_sent_messages.is_empty() && ws_is_connected => {
-                let _ = ws_input_ev_sender
-                    .send(input::websocket::Loop::Message(message))
-                    .await;
             }
         }
     }
