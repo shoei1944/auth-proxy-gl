@@ -1,11 +1,15 @@
-use crate::injector::types::request::profiles_by_usernames;
-use crate::injector::types::response::profile;
-use crate::{launcher, state};
-use axum::extract::{Path, State};
-use axum::http::StatusCode;
-use axum::response::IntoResponse;
-use axum::routing::{on, MethodFilter};
-use axum::{Json, Router};
+use crate::{
+    injector::types::{request::profiles_by_usernames, response::profile},
+    state,
+};
+use axum::{
+    extract::{Path, State},
+    http::StatusCode,
+    response::IntoResponse,
+    routing::{on, MethodFilter},
+    Json,
+    Router,
+};
 
 pub fn router() -> Router<state::State> {
     Router::new().route(
@@ -26,8 +30,8 @@ async fn profiles_by_usernames(
         return StatusCode::NO_CONTENT.into_response();
     };
 
-    let Ok(profiles) =
-        launcher::socket::execute_with_token_restore(socket.clone(), current_server, || {
+    let Ok(profiles) = socket
+        .with_token_restore(current_server, || {
             socket.batch_profiles_by_usernames(usernames.clone())
         })
         .await

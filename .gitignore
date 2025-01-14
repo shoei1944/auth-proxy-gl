@@ -2,3 +2,7 @@
 
 .idea
 config.json
+
+private.pem
+public.pem
+CHANGELOG.md

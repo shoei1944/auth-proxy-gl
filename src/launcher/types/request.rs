@@ -1,5 +1,4 @@
-use serde::de::DeserializeOwned;
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use uuid::Uuid;
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -14,8 +13,12 @@ pub struct Request<T: Serialize + DeserializeOwned> {
 
 pub mod any {
     use crate::launcher::types::request::{
-        batch_profiles_by_usernames, check_server, get_profile_by_username, get_profile_by_uuid,
-        restore_token, Request,
+        batch_profiles_by_usernames,
+        check_server,
+        get_profile_by_username,
+        get_profile_by_uuid,
+        restore_token,
+        Request,
     };
     use serde::{Deserialize, Serialize};
 

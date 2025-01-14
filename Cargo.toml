@@ -1,12 +1,14 @@
 [package]
 name = "auth-proxy-gl"
 version = "0.1.2"
+authors = ["IXLShizua"]
 edition = "2021"
 
 [dependencies]
 anyhow = "1.0.93"
 axum = "0.7.9"
 base64 = "0.22.1"
+clap = { version = "4.5.23", features = ["derive"] }
 dashmap = "6.1.0"
 figment = { version = "0.10.19", features = ["json"] }
 futures = "0.3.31"
@@ -15,8 +17,9 @@ rustls = "0.23.18"
 serde = { version = "1.0.215", features = ["derive"] }
 serde_json = "1.0.133"
 tokio = { version = "1.41.1", features = ["full"] }
-tokio-tungstenite = { version = "0.24.0", features = ["rustls-tls-native-roots"] }
+tokio-tungstenite = { version = "0.26.0", features = ["rustls-tls-native-roots", "url"] }
 tokio-util = "0.7.12"
 tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
+url = { version = "2.5.4", features = ["serde"] }
 uuid = { version = "1.11.0", features = ["serde", "v4"] }
