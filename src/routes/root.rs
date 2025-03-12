@@ -26,7 +26,7 @@ async fn root(
             implementation_name: Some("Auth-Proxy-GL".to_string()),
             implementation_version: None,
         },
-        skin_domains: Vec::new(),
+        skin_domains: vec!["api.lobstercraft.ru".to_string()],
         signature_public_key: state.key_pair.public.to_string(),
     };
 
