@@ -168,7 +168,7 @@ pub mod base {
 
                     #[serde(rename = "default")]
                     #[default]
-                    Classic,
+                    Default,
                 }
             }
         }
