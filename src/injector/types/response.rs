@@ -103,9 +103,13 @@ pub mod profile {
                         }
 
                         #[derive(Serialize, Deserialize, Debug)]
-                        pub enum Model {
-                            #[serde(rename = "slim")]
-                            Slim,
+                pub enum Model {
+                    #[serde(rename = "slim")]
+                    Slim,
+
+                    #[serde(rename = "classic")]
+                    #[default]
+                    Default,
                         }
                     }
                 }
