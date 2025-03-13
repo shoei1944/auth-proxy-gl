@@ -107,7 +107,7 @@ pub mod profile {
                             #[serde(rename = "slim")]
                             Slim,
 
-                            #[serde(rename = "default")]
+                            #[serde(rename = "classic")]
                             #[default]
                             Default,
                         }
