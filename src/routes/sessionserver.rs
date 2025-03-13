@@ -108,7 +108,9 @@ fn transform_profile(
     let skin = profile.assets.skin.map(|skin| skin::Skin {
         url: skin.url,
         metadata: skin.metadata.and_then(|meta| match meta.model {
-            Model::Default => return None,
+            Model::Default => Some(metadata::Metadata {
+                model: metadata::Model::Default,
+            }),
             Model::Slim => Some(metadata::Metadata {
                 model: metadata::Model::Slim,
             }),
