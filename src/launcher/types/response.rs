@@ -167,6 +167,7 @@ pub mod base {
                     Slim,
 
                     #[serde(rename = "default")]
+                    #[default]
                     Default,
                 }
             }
