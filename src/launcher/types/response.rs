@@ -164,11 +164,7 @@ pub mod base {
                 #[derive(Serialize, Deserialize, Default, Debug, Eq, PartialEq)]
                 pub enum Model {
                     #[serde(rename = "slim")]
-                    Slim,
-
-                    #[serde(rename = "default")]
-                    #[default]
-                    Default,
+                    Slim
                 }
             }
         }
