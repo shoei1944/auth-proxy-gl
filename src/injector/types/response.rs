@@ -106,9 +106,10 @@ pub mod profile {
                         pub enum Model {
                             #[serde(rename = "slim")]
                             Slim,
-                        #[serde(rename = "classic")]
-                    #[default]
-                    Default,
+
+                            #[serde(rename = "default")]
+                            #[default]
+                            Default,
                         }
                     }
                 }
